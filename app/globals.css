@@ -1,0 +1,36 @@
+@import "tailwindcss";
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+  }
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+/* 不放进任何 @layer：与 antd 注入的全局 a 样式（未分层）同级竞争，
+   依靠更高的类选择器优先级取胜。给需要还原链接原生行为的 <a> 加 link-reset 类：
+   颜色继承父元素、去掉下划线。Tailwind 工具类在 @layer utilities 内，压不过 antd 全局样式，
+   不要试图用 text-white / no-underline 之类覆盖 antd 的链接色 */
+.link-reset {
+  color: inherit;
+  text-decoration: none;
+  background-color: inherit;
+}
