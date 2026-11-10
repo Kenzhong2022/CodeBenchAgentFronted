@@ -1,106 +1,42 @@
 "use client";
 
-import { useMemo } from "react";
-import * as echarts from "echarts/core";
-import { TooltipComponent } from "echarts/components";
-import { PieChart } from "echarts/charts";
-import { CanvasRenderer } from "echarts/renderers";
-import { useECharts } from "@/lib/useECharts";
-
-// 按需注册本组件用到的 ECharts 能力（模块级执行一次，重复调用幂等）
-echarts.use([PieChart, TooltipComponent, CanvasRenderer]);
+import ProgressRing, { type RingColorStop } from "./ProgressRing";
 
 // 每级所需经验值：等级 = floor(经验 / 100) + 1，最高为 rawMax / 100 级
 const LEVEL_STEP = 100;
 
-// 内半径占比：ECharts 圆环与中心头像直径共用此值，保证同源
-const INNER_RATIO = 0.64;
-const OUTER_RATIO = 0.82;
-
-// 进度环渐变色（未满级）
-const PROGRESS_GRADIENT = [
-  { offset: 0, color: "#22d3ee" },
-  { offset: 0.5, color: "#60a5fa" },
-  { offset: 1, color: "#a855f7" },
-];
-// 满级金色渐变
-const FULL_GRADIENT = [
-  { offset: 0, color: "#fde047" },
-  { offset: 1, color: "#f59e0b" },
-];
-
 /**
- * @description 构建经验环圆环的 ECharts 配置（纯函数，便于复用与测试）
- * @param raw 当前经验值
- * @param rawMax 经验上限
+ * @description 构造 echarts 线性渐变的纯对象形式（等价 new echarts.graphic.LinearGradient），
+ *              从左上到右下过渡，弧段上呈现渐进色效果
  */
-function buildDonutOption(
-  raw: number,
-  rawMax: number,
-): echarts.EChartsCoreOption {
-  const clamp = (v: number, min: number, max: number) =>
-    Math.max(min, Math.min(max, v));
-  const pct = clamp((raw / rawMax) * 100, 0, 100);
-  const isFull = pct >= 100 - 1e-9;
-  const gradient = isFull ? FULL_GRADIENT : PROGRESS_GRADIENT;
-  const pctText = (Math.round(pct * 10) / 10).toFixed(1);
-  const level = Math.min(
-    Math.floor(raw / LEVEL_STEP) + 1,
-    Math.floor(rawMax / LEVEL_STEP),
-  );
-
+function gradient(from: string, to: string): RingColorStop["color"] {
   return {
-    backgroundColor: "transparent",
-    // 内置 tooltip：hover 圆环扇区时展示等级、经验值与进度
-    tooltip: {
-      trigger: "item",
-      backgroundColor: "rgba(15,23,42,.94)",
-      borderColor: "#334155",
-      textStyle: { color: "#e2e8f0" },
-      formatter: () =>
-        [
-          `<div>等级：Lv.${level}${isFull ? "（MAX）" : ""}</div>`,
-          `<div>经验值：${raw} / ${rawMax}</div>`,
-          `<div>进度：${pctText}%</div>`,
-        ].join(""),
-    },
-    series: [
-      {
-        type: "pie",
-        radius: [`${INNER_RATIO * 100}%`, `${OUTER_RATIO * 100}%`],
-        center: ["50%", "50%"],
-        startAngle: 90,
-        clockwise: true,
-        animationDuration: 900,
-        animationEasing: "cubicOut",
-        label: { show: false },
-        labelLine: { show: false },
-        emphasis: { scale: false },
-        data: [
-          {
-            value: pct,
-            itemStyle: {
-              color: new echarts.graphic.LinearGradient(0, 0, 1, 1, gradient),
-              borderRadius: isFull ? 0 : 10,
-            },
-          },
-          {
-            value: 100 - pct,
-            itemStyle: {
-              color: "#1e293b",
-              borderRadius: 100 - pct >= 100 ? 0 : 10,
-            },
-          },
-        ],
-      },
+    type: "linear",
+    x: 0,
+    y: 0,
+    x2: 1,
+    y2: 1,
+    colorStops: [
+      { offset: 0, color: from },
+      { offset: 1, color: to },
     ],
   };
 }
 
+// 经验环分段渐变配色：低进度黄、中段橙、高进度绿，可整体替换
+const XP_COLORS: RingColorStop[] = [
+  { until: 30, color: gradient("#fde047", "#eab308") }, // <30% 黄
+  { until: 60, color: gradient("#fb923c", "#ea580c") }, // <60% 橙
+  { until: Infinity, color: gradient("#4ade80", "#16a34a") }, // ≥60% 绿
+];
+
+// 满 100% 时的金黄渐变（亮金 → 深金）
+const XP_FULL_COLOR = gradient("#fde047", "#f59e0b");
+
 /**
- * @description 经验环头像组件：ECharts 圆环进度条（useECharts 统一管理实例）+
- *              中心头像撑满内圈，百分比文字叠在头像底部；满级时进度变金色并显示 MAX 文案。
- *              hover 通过 antd Tooltip 展示等级、经验值与进度
+ * @description 经验环头像：复用 ProgressRing 圆环，中央插槽放头像图片，
+ *              百分比文字叠在头像底部；满级时进度变金色并显示 MAX 文案。
+ *              hover 通过 ECharts tooltip 展示等级、经验值与进度
  * @param raw 当前经验值
  * @param rawMax 经验上限
  * @param src 头像图片地址（默认取 public 下的默认头像 /wcr.jpeg）
@@ -117,41 +53,43 @@ export default function ExperienceAvatar({
   src?: string;
   size?: number;
 }) {
-  // option 用 useMemo 缓存，经验值变化时才重新构建并触发重绘
-  const option = useMemo(() => buildDonutOption(raw, rawMax), [raw, rawMax]);
-  // 实例创建 / resize / 销毁由 useECharts 统一管理
-  const chartRef = useECharts(option);
-
   const pct = Math.max(0, Math.min(100, (raw / rawMax) * 100));
   const isFull = pct >= 100 - 1e-9;
   const pctText = (Math.round(pct * 10) / 10).toFixed(1);
+  const level = Math.min(
+    Math.floor(raw / LEVEL_STEP) + 1,
+    Math.floor(rawMax / LEVEL_STEP),
+  );
 
   return (
-    <div style={{ position: "relative", width: size, height: size }}>
-      {/* 圆环进度条 */}
-      <div ref={chartRef} style={{ width: "100%", height: "100%" }} />
-
-      {/* 中心头像：直径等于内圈直径，圆形裁切 */}
+    <ProgressRing
+      value={raw}
+      max={rawMax}
+      size={size}
+      // 分段渐变配色 + 满级金黄渐变（不随 ProgressRing 默认断点色变化）
+      colors={XP_COLORS}
+      fullColor={XP_FULL_COLOR}
+      tooltipLines={[
+        `<div>等级：Lv.${level}${isFull ? "（MAX）" : ""}</div>`,
+        `<div>经验值：${raw} / ${rawMax}</div>`,
+        `<div>进度：${pctText}%</div>`,
+      ]}
+    >
+      {/* 中央头像：占插槽的 85%，圆形裁切 */}
       <div
         style={{
-          position: "absolute",
-          top: "50%",
-          left: "50%",
-          transform: "translate(-50%, -50%)",
-          width: `${INNER_RATIO * 85}%`,
-          aspectRatio: "1",
+          width: "85%",
+          height: "85%",
           borderRadius: "50%",
           overflow: "hidden",
-          pointerEvents: "none",
+          position: "relative",
           background: isFull
             ? "radial-gradient(circle at 50% 35%, #3b2f0b, #1c1503 80%)"
             : "radial-gradient(circle at 50% 35%, #1e293b, #0b1120 80%)",
-          boxShadow: isFull
-            ? "inset 0 0 0 3px rgba(251, 191, 36, .85)"
-            : "none",
+          boxShadow: isFull ? "inset 0 0 0 3px rgba(251, 191, 36, .85)" : "none",
         }}
       >
-        {/* 头像层：铺满内圈并裁切，默认取 public 下的 wcr.jpeg */}
+        {/* 头像层：铺满并裁切，默认取 public 下的 wcr.jpeg */}
         <img
           src={src}
           alt="头像"
@@ -170,7 +108,7 @@ export default function ExperienceAvatar({
             left: 0,
             right: 0,
             bottom: 0,
-            padding: `${size * 0.1}px 10px ${size * 0.05}px`,
+            padding: `${size * 0.085}px 8px ${size * 0.04}px`,
             display: "flex",
             flexDirection: "column",
             alignItems: "center",
@@ -204,6 +142,6 @@ export default function ExperienceAvatar({
           </div>
         </div>
       </div>
-    </div>
+    </ProgressRing>
   );
 }
