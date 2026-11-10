@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
 
 /**
- * @description Python 服务端（CodeBenchAgent FastAPI）地址：本地开发默认 8000 端口，部署时通过环境变量覆盖
+ * @description Python 服务端（CodeBenchAgent FastAPI）地址：暂时连接线上部署
+ *              （https://codebenchagent.vercel.app），本地开发可经 CODEBENCH_API_URL 覆盖回 127.0.0.1:8000
  */
 // Worker 运行时模块加载阶段拿不到请求级环境变量，必须在请求时读取
 function apiBase(): string {
-  return process.env.CODEBENCH_API_URL ?? "http://127.0.0.1:8000";
+  return process.env.CODEBENCH_API_URL ?? "https://codebenchagent.vercel.app";
 }
 
 /**
@@ -23,9 +24,18 @@ export async function GET(req: Request): Promise<NextResponse> {
   const datasetName = params.get("dataset_name");
   if (datasetName) search.set("dataset_name", datasetName);
 
-  const res = await fetch(`${apiBase()}/api/problems/cursor?${search.toString()}`, {
-    cache: "no-store",
-  });
+  // 后端未启动 / 网络不可达时 fetch 会抛 TypeError（如 ECONNREFUSED），兜底为 502
+  let res: Response;
+  try {
+    res = await fetch(`${apiBase()}/api/problems/cursor?${search.toString()}`, {
+      cache: "no-store",
+    });
+  } catch {
+    return NextResponse.json(
+      { error: `后端服务不可用（${apiBase()}），请确认 FastAPI 服务已启动` },
+      { status: 502 },
+    );
+  }
   const body = await res.json().catch(() => null);
   if (!res.ok) {
     const detail = (body as { detail?: string } | null)?.detail ?? "Python 服务端请求失败";
