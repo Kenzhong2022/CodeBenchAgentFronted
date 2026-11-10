@@ -64,7 +64,7 @@ export default function RecentProblems({
         <Alert
           type="error"
           showIcon
-          message="加载失败"
+          title="加载失败"
           description={error}
           action={
             <Button size="small" icon={<ReloadOutlined />} onClick={onRetry}>
@@ -75,7 +75,7 @@ export default function RecentProblems({
       ) : recent!.length === 0 ? (
         <Typography.Text type="secondary">题库暂无题目</Typography.Text>
       ) : (
-        <Space direction="vertical" size={8} style={{ width: "100%" }}>
+        <Space orientation="vertical" size={8} style={{ width: "100%" }}>
           {recent!.slice(0, maxCount).map((item) => (
             <Link
               key={item.id}
