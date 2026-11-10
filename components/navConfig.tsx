@@ -5,7 +5,6 @@ import {
   BgColorsOutlined,
   BookOutlined,
   CodeOutlined,
-  FileDoneOutlined,
 } from "@ant-design/icons";
 
 export type NavGroup = {
@@ -13,7 +12,12 @@ export type NavGroup = {
   label: string;
   icon?: ReactNode;
   // 二级菜单项，key 即带 tab 参数的目标路由；description 用于顶部导航弹出面板
-  children: { key: string; label: string; description?: string; icon?: ReactNode }[];
+  children: {
+    key: string;
+    label: string;
+    description?: string;
+    icon?: ReactNode;
+  }[];
 };
 
 /**
@@ -33,24 +37,13 @@ export const NAV_GROUPS: NavGroup[] = [
     ],
   },
   {
-    key: "/manage",
-    label: "提交管理",
-    children: [
-      {
-        key: "/manage",
-        label: "提交管理",
-        description: "用户提交代码、评测状态与 Agent 反馈",
-        icon: <FileDoneOutlined />,
-      },
-    ],
-  },
-  {
     key: "/colors",
     label: "色系",
     icon: <BgColorsOutlined />,
     children: [
       {
-        key: "/colors",
+        // 子项 key 不能与分组 key 相同：antd Menu 内部按 key 建扁平映射，重复会互相覆盖
+        key: "/colors?tab=preview",
         label: "色系预览",
         description: "antd 主题颜色 token 预览",
         icon: <BgColorsOutlined />,
@@ -63,7 +56,7 @@ export const NAV_GROUPS: NavGroup[] = [
     icon: <ApiOutlined />,
     children: [
       {
-        key: "/css-vars",
+        key: "/css-vars?tab=preview",
         label: "CSS 变量",
         description: "antd 生成的 --ant-* CSS 变量浏览器",
         icon: <ApiOutlined />,
