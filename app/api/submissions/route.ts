@@ -1,14 +1,14 @@
 import { NextResponse } from "next/server";
 import { getSupabase } from "@/lib/supabase";
 
-// 提交记录独立 API：字段与建表.md 的 submissions 表一一对应
-// problem_id 与 problems.id 为逻辑关联（不建物理外键）；id / created_at 由数据库维护，不接受写入
+// 提交记录独立 API：account_id 逻辑关联 accounts.id（不建物理外键）；
+// id / created_at 由数据库维护，不接受写入
 
 // 沙箱评测结果状态：AC(通过) / WA(答案错误) / CE(编译错误) / RE(运行错误) / TLE(超时)
 const STATUS_VALUES = new Set(["AC", "WA", "CE", "RE", "TLE"]);
 
 // 必填字段：与表结构 NOT NULL 约束一致
-const REQUIRED_FIELDS = ["problem_id", "user_code", "status"] as const;
+const REQUIRED_FIELDS = ["problem_id", "account_id", "status"] as const;
 
 // 校验并转换请求体，只保留白名单列；返回首个校验错误信息
 function sanitize(body: unknown): { row?: Record<string, unknown>; error?: string } {
@@ -23,10 +23,13 @@ function sanitize(body: unknown): { row?: Record<string, unknown>; error?: strin
     }
     row.problem_id = problemId;
   }
-  if (source.user_code !== undefined) {
-    const userCode = String(source.user_code);
-    if (!userCode.trim()) return { error: "用户代码不能为空" };
-    row.user_code = userCode;
+  if (source.account_id !== undefined) {
+    // accounts.id 是 UUID 字符串，与 problem_id（自增整数）不同，只做非空校验
+    const accountId = String(source.account_id).trim();
+    if (!accountId) {
+      return { error: "account_id 不能为空" };
+    }
+    row.account_id = accountId;
   }
   if (source.status !== undefined) {
     const status = String(source.status).toUpperCase();

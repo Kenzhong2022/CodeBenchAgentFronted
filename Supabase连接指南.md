@@ -60,7 +60,7 @@ export default supabase;
 
 ## 4. 常用操作示例
 
-数据库现有 5 张表：`roles`、`users`、`products`、`problems`（题库）、`submissions`（提交记录）。
+数据库现有 5 张表：`roles`、`accounts`、`products`、`problems`（题库）、`submissions`（提交记录）。
 
 **查询列表**
 

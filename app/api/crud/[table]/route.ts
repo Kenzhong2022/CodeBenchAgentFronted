@@ -5,7 +5,8 @@ import { getSupabase } from "@/lib/supabase";
 // 题库（problems）与提交记录（submissions）已拆分到独立路由 app/api/problems、app/api/submissions
 const COLUMNS = {
   roles: ["id", "name", "description"],
-  users: ["id", "name", "email", "role"],
+  // accounts：用户账号表；只暴露展示字段，密码等敏感列不进白名单
+  accounts: ["id", "name", "email", "avatar"],
   products: ["id", "name", "price", "stock"],
 } as const;
 

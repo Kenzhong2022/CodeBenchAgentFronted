@@ -20,6 +20,9 @@ type Row = TableRow;
 // 题目摘要：仅 id 与标题，用于下拉选项和单元格展示
 type ProblemBrief = { id: string | number; title: string };
 
+// 账号摘要：仅 id 与名称，用于提交账号下拉选项和单元格展示
+type AccountBrief = { id: string | number; name: string };
+
 // 评测状态：沙箱返回的枚举值及展示颜色
 const STATUS_META: Record<string, { color: string; label: string }> = {
   AC: { color: "green", label: "通过" },
@@ -40,10 +43,11 @@ const FILTER_FIELDS: FilterField[] = [
   { name: "createdAt", label: "提交时间", type: "dateRange" },
 ];
 
-// 提交管理：submissions 表的增删改查；题目字段关联 problems 表做下拉选择与展示
+// 提交管理：submissions 表的增删改查；题目 / 账号字段关联 problems、accounts 表做下拉选择与展示
 export default function SubmissionManager() {
   const [rows, setRows] = useState<Row[]>([]);
   const [problems, setProblems] = useState<ProblemBrief[]>([]);
+  const [accounts, setAccounts] = useState<AccountBrief[]>([]);
   const [filters, setFilters] = useState<FilterValues>({});
   // 组件卸载后不再回写拉取结果
   const cancelledRef = useRef(false);
@@ -53,14 +57,18 @@ export default function SubmissionManager() {
     let cancelled = false;
     (async () => {
       try {
-        const [submissions, problems] = await Promise.all([
+        const [submissions, problems, accounts] = await Promise.all([
           fetchRows("submissions"),
           fetchRows("problems"),
+          fetchRows("accounts"),
         ]);
         if (cancelled) return;
         setRows(submissions);
         setProblems(
           problems.map((p) => ({ id: p.id, title: String(p.title ?? "") }))
+        );
+        setAccounts(
+          accounts.map((a) => ({ id: a.id, name: String(a.name ?? "") }))
         );
       } catch (err) {
         console.error("[submissions] 加载失败", err);
@@ -78,11 +86,21 @@ export default function SubmissionManager() {
     return map;
   }, [problems]);
 
-  // 题目下拉的选项跟题库数据联动，新增提交时只能选择已有题目
+  const accountNameById = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const a of accounts) map.set(String(a.id), a.name);
+    return map;
+  }, [accounts]);
+
+  // 题目 / 账号下拉的选项跟对应表数据联动，新增提交时只能选择已有题目与账号
   const fields = useMemo<CrudField[]>(() => {
     const problemOptions = problems.map((p) => ({
       label: `#${p.id} ${p.title}`,
       value: p.id,
+    }));
+    const accountOptions = accounts.map((a) => ({
+      label: `#${a.id} ${a.name}`,
+      value: a.id,
     }));
     return [
       {
@@ -96,7 +114,17 @@ export default function SubmissionManager() {
           return title ? `#${idText} ${title}` : `#${idText}`;
         },
       },
-      { name: "user_code", label: "用户代码", type: "textarea" },
+      {
+        name: "account_id",
+        label: "提交账号",
+        type: "select",
+        options: accountOptions,
+        render: (value) => {
+          const name = accountNameById.get(String(value));
+          const idText = String(value);
+          return name ? `#${idText} ${name}` : `#${idText}`;
+        },
+      },
       {
         name: "status",
         label: "评测状态",
@@ -121,7 +149,7 @@ export default function SubmissionManager() {
         render: (value) => dayjs(String(value)).format("YYYY-MM-DD HH:mm"),
       },
     ];
-  }, [problems, problemTitleById]);
+  }, [problems, problemTitleById, accounts, accountNameById]);
 
   // 点击查询后的可见行；problemTitle 是展示用计算字段，按题目标题过滤
   const visibleRows = useMemo(
