@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getSupabase } from "@/lib/supabase";
 
 /**
  * @description Python 服务端（CodeBenchAgent FastAPI）地址：本地开发默认 8000 端口，部署时通过环境变量覆盖
@@ -42,6 +43,15 @@ function errorResponse(status: number, body: unknown): NextResponse {
 export async function GET(req: Request): Promise<NextResponse> {
   const params = new URL(req.url).searchParams;
   const id = params.get("id");
+
+  // count_only=1：直接向 Supabase 做精确计数（head 请求不拉数据），供统计卡片获取题库总数
+  if (!id && params.get("count_only")) {
+    const { count, error } = await getSupabase()
+      .from("problems")
+      .select("id", { count: "exact", head: true });
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ count: count ?? 0 });
+  }
 
   if (id) {
     const { ok, status, body } = await callPython(`/api/problems/${id}`);
