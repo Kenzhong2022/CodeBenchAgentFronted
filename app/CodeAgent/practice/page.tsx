@@ -1,61 +1,20 @@
 "use client";
 
-import { Suspense, useEffect, useRef, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Alert, App, Button, Select, Spin, Splitter, Tabs, Tag } from "antd";
-import {
-  CheckSquareOutlined,
-  CodeOutlined,
-  PlayCircleOutlined,
-  ThunderboltOutlined,
-} from "@ant-design/icons";
+import { Alert, Button, Divider, Space, Spin, Typography, Tooltip } from "antd";
+import { LeftOutlined, RightOutlined } from "@ant-design/icons";
 import PageLayout from "@/components/PageLayout";
+import PageHeader from "@/components/PageHeader";
 import type { PreviewProblem } from "@/components/ProblemStatement";
-import ProblemStatement from "@/components/ProblemStatement";
-import CodeEditor, { type EditorLanguage } from "@/components/CodeEditor";
-import { getPyodide } from "@/lib/pyodide";
-
-// 练习页默认代码模板：作答入口，占位 TODO 引导用户书写
-const DEFAULT_CODE =
-  "def solution():\n    # TODO: 在这里编写你的解答\n    pass\n";
-
-// 单个测试用例的运行结果：passed 为通过与否，error 为失败时的报错摘要
-type CaseResult = { passed: boolean; error: string | null };
-
-// 逐用例执行脚本：先跑用户代码，再依次 exec 每条断言，结果以 JSON 返回
-const RUN_HARNESS = `
-import io, json, contextlib, traceback
-
-_results = []
-_console = io.StringIO()
-_compile_error = None
-_g = {}
-with contextlib.redirect_stdout(_console), contextlib.redirect_stderr(_console):
-    try:
-        for _imp in _imports:
-            exec(_imp, _g)
-        exec(_user_code, _g)
-        for _case in _cases:
-            try:
-                exec(_case, _g)
-                _results.append({"passed": True, "error": None})
-            except Exception as _exc:
-                _results.append({
-                    "passed": False,
-                    "error": "".join(traceback.format_exception_only(type(_exc), _exc)).strip(),
-                })
-    except Exception as _exc:
-        _compile_error = "".join(
-            traceback.format_exception(type(_exc), _exc, _exc.__traceback__)
-        ).strip()
-
-json.dumps({"results": _results, "console": _console.getvalue(), "compile_error": _compile_error})
-`;
+import PracticeWorkbench from "./PracticeWorkbench";
 
 // CodeAgent 练习页主体：按 URL 中的 id 从题库接口拉取题目，展示与预览页一致的题面布局
 function PracticeSection() {
-  const { message } = App.useApp();
   const searchParams = useSearchParams();
+  // 当前题目 id 完全由 URL 驱动：上一题 / 下一题是真实的 <a> 链接（?id=N），
+  // 点击即路由切换，地址栏与实际题目始终一致，刷新 / 分享 / 中键新开均可
   const id = searchParams.get("id");
   // undefined 表示仍在请求中；null 表示未找到
   const [problem, setProblem] = useState<PreviewProblem | null | undefined>(
@@ -63,59 +22,110 @@ function PracticeSection() {
   );
   const [error, setError] = useState<string | null>(null);
   const [reloadTick, setReloadTick] = useState(0);
-  // 作答代码：切换题目时重置为默认模板
-  const [code, setCode] = useState(DEFAULT_CODE);
-  // 浏览器端运行状态与输出（Pyodide）；ref 同步保存输出以避免闭包读到旧值
-  const [isRunning, setIsRunning] = useState(false);
-  const [output, setOutput] = useState<string | null>(null);
-  const outputRef = useRef<string | null>(null);
-  // 逐用例结果：与 problem.test_cases 下标对应；null 表示本轮没有可执行结果（如代码本身报错）
-  const [caseResults, setCaseResults] = useState<CaseResult[] | null>(null);
-  // 右下结果面板：测试用例 / 测试结果 两个 Tab；运行时自动切到「测试结果」
-  const [panelTab, setPanelTab] = useState("cases");
-  // 作答语言（参考 LeetCode：编辑器上方下拉切换）
-  const [language, setLanguage] = useState<EditorLanguage>("python");
+  // 是否有题目请求在途：切题时工作台保持挂载显示旧题，仅盖遮罩提示；
+  // problem === undefined 仅表示首次进入尚未加载过任何题目
+  const [fetching, setFetching] = useState(false);
+
+  /** @description 当前题目的数字 id（用于上一题 / 下一题的边界判断） */
+  const problemId = id ? Number(id) : null;
 
   /**
-   * @description 覆写输出内容（同步 ref 与 state）
+   * @description 上一题 / 下一题链接样式：可用时渲染 <Link>（主题色 + hover 变色），
+   *              越界或无 id 时渲染灰色占位 span（不可点），两者宽度形态一致不跳动
    */
-  function writeOutput(text: string | null) {
-    outputRef.current = text;
-    setOutput(text);
-  }
 
-  /**
-   * @description 追加一行输出（同步 ref 与 state）
-   */
-  function appendOutput(text: string) {
-    writeOutput((outputRef.current ?? "") + text + "\n");
-  }
+  // 头部导航：上一题 / 下一题，Space 用竖分隔符隔开；链接始终可点，
+  // 连续切换由 effect 的 cancelled 标记丢弃过期响应，不会产生结果错乱
+  const navLinkClass =
+    "inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[13px] transition-colors hover:bg-(--ant-button-link-hover-bg) hover:text-(--ant-btn-text-color-hover)";
+  const navDisabledClass =
+    "inline-flex items-center gap-1 text-[13px] text-(--ant-color-text-quaternary) cursor-not-allowed";
+  const navExtra = (
+    <Space>
+      <Tooltip title={problemId && problemId > 1 ? "上一题" : "无上一题"}>
+        {problemId && problemId > 1 ? (
+          <Link
+            href={`/CodeAgent/practice?id=${problemId - 1}`}
+            className={navLinkClass}
+          >
+            <LeftOutlined />
+          </Link>
+        ) : (
+          <div className={navDisabledClass}>
+            <LeftOutlined />
+          </div>
+        )}
+      </Tooltip>
+
+      <Tooltip title={problemId ? "下一题" : "无下一题"}>
+        {problemId ? (
+          <Link
+            href={`/CodeAgent/practice?id=${problemId + 1}`}
+            className={navLinkClass}
+          >
+            <RightOutlined />
+          </Link>
+        ) : (
+          <div className={navDisabledClass}>
+            <RightOutlined />
+          </div>
+        )}
+      </Tooltip>
+    </Space>
+  );
+
+  // 加载遮罩：半透明盖在当前内容上（工作台 / 错误提示），不卸载旧内容、避免切题闪烁
+  const loadingOverlay = fetching ? (
+    <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-(--ant-color-bg-container)/60">
+      <Spin size="large" />
+      <Typography.Text type="secondary">正在加载题目…</Typography.Text>
+    </div>
+  ) : null;
 
   useEffect(() => {
     if (!id) {
       setProblem(null);
+      setFetching(false);
       return;
     }
-    setProblem(undefined);
     setError(null);
-    setCode(DEFAULT_CODE);
+    // 注意不把 problem 置回 undefined：已有旧题时保持显示，由遮罩提示加载中
+    setFetching(true);
+    // cancelled 标记：快速连切题目时丢弃过期响应，只有最后一次请求能写入状态
+    let cancelled = false;
     fetch(`/api/problems?id=${encodeURIComponent(id)}`)
       .then(async (res) => {
         const detail = await res.json().catch(() => null);
+        if (cancelled) return;
         if (!res.ok) {
           throw new Error(detail?.error ?? "加载题目失败");
         }
         setProblem(detail as PreviewProblem);
       })
       .catch((err: Error) => {
+        if (cancelled) return;
         setError(err.message);
         setProblem(null);
+      })
+      .finally(() => {
+        if (!cancelled) setFetching(false);
       });
+    return () => {
+      cancelled = true;
+    };
   }, [id, reloadTick]);
 
   if (problem === undefined) {
     return (
-      <PageLayout title="在线练习" description="正在加载题目…">
+      <PageLayout
+        header={
+          <PageHeader
+            title="在线练习"
+            description="正在加载题目…"
+            extra={navExtra}
+          />
+        }
+      >
         <div className="flex justify-center py-24">
           <Spin />
         </div>
@@ -124,226 +134,45 @@ function PracticeSection() {
   }
   if (!problem) {
     return (
-      <PageLayout title="在线练习" description="加载失败或题目不存在。">
-        <Alert
-          type="error"
-          showIcon
-          message={error ?? "未找到题目数据"}
-          description="请从 CodeAgent 题库列表重新进入。"
-          action={
-            <Button size="small" onClick={() => setReloadTick((t) => t + 1)}>
-              重试
-            </Button>
-          }
-        />
+      <PageLayout
+        header={
+          <PageHeader
+            title="在线练习"
+            description="加载失败或题目不存在。"
+            extra={navExtra}
+          />
+        }
+      >
+        <div className="relative">
+          <Alert
+            type="error"
+            showIcon
+            message={error ?? "未找到题目数据"}
+            description="请从 CodeAgent 题库列表重新进入。"
+            action={
+              <Button size="small" onClick={() => setReloadTick((t) => t + 1)}>
+                重试
+              </Button>
+            }
+          />
+          {loadingOverlay}
+        </div>
       </PageLayout>
     );
   }
-  /**
-   * @description 在浏览器端用 Pyodide 运行当前代码：逐个执行测试用例并收集每条断言的通过情况
-   */
-  async function handleRun() {
-    if (isRunning || !problem) return;
-    setIsRunning(true);
-    setPanelTab("result");
-    setCaseResults(null);
-    writeOutput("正在加载 Python 环境并执行…");
-    try {
-      const pyodide = await getPyodide();
-      pyodide.setStdout({ batched: appendOutput });
-      pyodide.setStderr({ batched: appendOutput });
-
-      // 把用户代码与用例注入全局变量，交给 Python 侧脚本逐条执行
-      pyodide.globals.set("_user_code", code);
-      pyodide.globals.set("_cases", problem.test_cases ?? []);
-      pyodide.globals.set("_imports", problem.test_imports ?? []);
-      writeOutput("");
-      const raw = await pyodide.runPythonAsync(RUN_HARNESS);
-      const report = JSON.parse(String(raw)) as {
-        results: CaseResult[];
-        console: string;
-        compile_error: string | null;
-      };
-
-      if (report.compile_error) {
-        writeOutput(`运行报错:\n${report.compile_error}`);
-      } else {
-        setCaseResults(report.results);
-        writeOutput(report.console || "(无输出)");
-      }
-    } catch (error) {
-      writeOutput(`运行报错:\n${(error as Error).message ?? String(error)}`);
-    } finally {
-      setIsRunning(false);
-    }
-  }
-
-  /**
-   * @description 提交当前代码进行评测；评测服务尚未上线，先提示占位反馈
-   */
-  function handleSubmit() {
-    if (!code.trim()) {
-      message.warning("代码为空，请先编写解答");
-      return;
-    }
-    message.info("评测服务即将上线，代码已记录");
-  }
-
-  // LeetCode 式工作台布局：外层左右 Splitter（题面 | 工作台），右侧内部上下 Splitter（编辑器 | 用例面板）
   return (
     <PageLayout
-      title={problem.title || `题目 #${problem.id}`}
-      description="在线练习：阅读题面与测试用例，完成编码后提交评测。"
-      backHref="/CodeAgent?tab=problems"
+      // 工作台模式：内容区不随页面滚动（Splitter 内部各自滚动），高度填满标题区以下剩余空间
+      contentClassName="overflow-hidden"
+      header={
+        <PageHeader backHref="/CodeAgent?tab=problems" extra={navExtra} />
+      }
     >
-      <div className="h-[calc(100vh-230px)] min-h-[480px]">
-        <Splitter>
-          {/* 左侧：题面，独立滚动，可拖拽调宽 */}
-          <Splitter.Panel defaultSize="42%" min="28%" max="60%">
-            <div className="h-full overflow-y-auto pr-3 bg-(--ant-color-bg-container) ">
-              <ProblemStatement problem={problem} />
-            </div>
-          </Splitter.Panel>
-
-          {/* 右侧：上下 Splitter（编辑器 | 测试用例/结果面板） */}
-          <Splitter.Panel min="40%" max="72%">
-            <Splitter orientation="vertical">
-              {/* 上：语言栏 + 代码编辑器 */}
-              <Splitter.Panel defaultSize="58%" min="30%" max="80%">
-                <div className="flex h-full flex-col gap-2 bg-(--ant-color-bg-container) p-3">
-                  <div className="flex items-center justify-between">
-                    <Select
-                      size="small"
-                      style={{ width: 110 }}
-                      value={language}
-                      onChange={setLanguage}
-                      options={[
-                        { value: "python", label: "Python" },
-                        { value: "java", label: "Java" },
-                      ]}
-                    />
-                    <div className="flex items-center gap-2">
-                      <Button
-                        size="small"
-                        icon={<PlayCircleOutlined />}
-                        loading={isRunning}
-                        onClick={handleRun}
-                      >
-                        运行
-                      </Button>
-                      <Button
-                        size="small"
-                        type="primary"
-                        icon={<ThunderboltOutlined />}
-                        onClick={handleSubmit}
-                      >
-                        提交评测
-                      </Button>
-                    </div>
-                  </div>
-                  <div className="min-h-0 flex-1">
-                    <CodeEditor
-                      value={code}
-                      onChange={setCode}
-                      language={language}
-                      height="100%"
-                    />
-                  </div>
-                </div>
-              </Splitter.Panel>
-
-              {/* 下：测试用例 / 测试结果 双 Tab 面板 */}
-              <Splitter.Panel min="20%" max="70%">
-                <div className="h-full overflow-y-auto bg-(--ant-color-bg-container) pt-3 pl-3">
-                  <Tabs
-                    activeKey={panelTab}
-                    onChange={setPanelTab}
-                    size="small"
-                    items={[
-                      {
-                        key: "cases",
-                        label: (
-                          <span>
-                            <CheckSquareOutlined /> 测试用例
-                          </span>
-                        ),
-                        children: (
-                          <Tabs
-                            size="small"
-                            items={(problem.test_cases ?? []).map(
-                              (testCase, index) => ({
-                                key: String(index),
-                                label: `Case ${index + 1}`,
-                                children: (
-                                  <pre className="overflow-x-auto rounded-lg bg-(--ant-color-fill-tertiary) p-3 font-mono text-[13px] leading-6 text-(--ant-color-text)">
-                                    {String(testCase)}
-                                  </pre>
-                                ),
-                              }),
-                            )}
-                          />
-                        ),
-                      },
-                      {
-                        key: "result",
-                        label: (
-                          <span>
-                            <CodeOutlined /> 测试结果
-                          </span>
-                        ),
-                        children:
-                          caseResults !== null ? (
-                            <div className="flex flex-col gap-2">
-                              {/* 逐用例结果：与「测试用例」Tab 中 Case N 一一对应 */}
-                              {caseResults.map((result, index) => (
-                                <div
-                                  key={index}
-                                  className="rounded-lg border border-(--ant-color-border-secondary) p-2"
-                                >
-                                  <div className="flex items-center gap-2 text-[13px]">
-                                    <Tag
-                                      color={
-                                        result.passed ? "success" : "error"
-                                      }
-                                      style={{ marginInlineEnd: 0 }}
-                                    >
-                                      {result.passed ? "通过" : "失败"}
-                                    </Tag>
-                                    <span className="font-medium">
-                                      Case {index + 1}
-                                    </span>
-                                  </div>
-                                  {!result.passed && result.error && (
-                                    <pre className="mt-2 overflow-x-auto whitespace-pre-wrap rounded bg-(--ant-color-fill-tertiary) p-2 font-mono text-[12px] leading-5 text-(--ant-color-text)">
-                                      {result.error}
-                                    </pre>
-                                  )}
-                                </div>
-                              ))}
-                              <div className="mt-1 text-xs text-(--ant-color-text-description)">
-                                控制台输出
-                              </div>
-                              <pre className="max-h-40 overflow-auto rounded-lg border border-(--ant-color-border-secondary) bg-(--ant-color-bg-layout) p-3 font-mono text-[13px] leading-6 text-(--ant-color-text)">
-                                {output ?? "(无输出)"}
-                              </pre>
-                            </div>
-                          ) : output !== null ? (
-                            <pre className="max-h-56 overflow-auto rounded-lg border border-(--ant-color-border-secondary) bg-(--ant-color-bg-layout) p-3 font-mono text-[13px] leading-6 text-(--ant-color-text)">
-                              {output}
-                            </pre>
-                          ) : (
-                            <div className="py-8 text-center text-xs text-(--ant-color-text-description)">
-                              点击「运行」逐个执行测试用例，这里展示每个用例的通过情况与输出
-                            </div>
-                          ),
-                      },
-                    ]}
-                  />
-                </div>
-              </Splitter.Panel>
-            </Splitter>
-          </Splitter.Panel>
-        </Splitter>
+      {/* 切题时工作台保持挂载显示旧题（key 未变不重建），请求在途由遮罩提示；
+          新数据到达后 key 变化触发销毁重建，代码 / 输出 / 用例结果等状态自动归零 */}
+      <div className="relative h-full">
+        <PracticeWorkbench key={problem.id} problem={problem} />
+        {loadingOverlay}
       </div>
     </PageLayout>
   );
