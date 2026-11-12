@@ -2,6 +2,7 @@
 
 import { Card, theme, Typography } from "antd";
 import PageLayout from "@/components/PageLayout";
+import PageHeader from "@/components/PageHeader";
 
 // 颜色分组清单：按用途归类，key 与 antd token 变量名一致
 const COLOR_GROUPS: { title: string; tokens: string[] }[] = [
@@ -191,8 +192,12 @@ export default function ColorsPage() {
 
   return (
     <PageLayout
-      title="色系"
-      description="antd 主题全部颜色 token 预览，颜色随当前主题算法（亮色 / 暗色 / 紧凑）自动变化"
+      header={
+        <PageHeader
+          title="色系"
+          description="antd 主题全部颜色 token 预览，颜色随当前主题算法（亮色 / 暗色 / 紧凑）自动变化"
+        />
+      }
     >
       <div className="flex flex-col gap-4">
         {COLOR_GROUPS.map((group) => (

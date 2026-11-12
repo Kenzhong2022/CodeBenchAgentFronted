@@ -2,9 +2,7 @@
 
 import { Suspense, useState } from "react";
 import type { ReactNode } from "react";
-import { App as AntApp, Button, Layout, Typography, theme } from "antd";
-import { ArrowLeftOutlined } from "@ant-design/icons";
-import { useRouter } from "next/navigation";
+import { App as AntApp, Layout, theme } from "antd";
 import { usePathname } from "next/navigation";
 import TopNav from "./TopNav";
 import SideNav from "./SideNav";
@@ -13,24 +11,22 @@ import { getActiveGroup } from "./navConfig";
 const { Content } = Layout;
 
 /**
- * @description 页面骨架：外层左右布局（侧边栏 | 右侧），右侧上下布局（顶栏 / 核心内容 / 页脚）
- * @param title 页面标题（可选）：省略时不渲染标题区；backHref 存在时标题区渲染为「返回列表」按钮
- * @param description 页面描述（可选）：标题下方的辅助说明文字
- * @param backHref 可选返回地址：传入后标题区渲染为「返回列表」链接，点击跳回该地址
+ * @description 页面骨架：外层左右布局（侧边栏 | 右侧），右侧上下布局（顶栏 / 核心内容 / 页脚）。
+ *              标题区不在骨架内实现——需要页头（标题 / 返回按钮）的页面自行组合
+ *              PageHeader 等组件传入 header 插槽
+ * @param header 页头插槽（可选）：渲染在内容区上方、高度由内容决定，不参与内容区滚动
+ * @param contentClassName 内容区包裹层 className（可选）：内容区为 flex 列布局、
+ *              包裹层自动 flex:1 占满 header 以下的剩余高度，可用 h-full / overflow-* 控制子内容
  */
 export default function PageLayout({
-  title,
-  description,
+  header,
   children,
-  backHref,
+  contentClassName,
 }: {
-  title?: string;
-  description?: string;
+  header?: ReactNode;
   children: ReactNode;
-  // 可选返回地址：传入后标题区渲染为「返回列表」链接，点击跳回该地址
-  backHref?: string;
+  contentClassName?: string;
 }) {
-  const router = useRouter();
   const pathname = usePathname();
   const activeGroup = getActiveGroup(pathname);
   // 收缩状态放在最外层，顶部按钮控制、侧边栏消费
@@ -71,33 +67,18 @@ export default function PageLayout({
               borderRadius: borderRadiusLG,
               flex: 1,
               overflow: "auto",
+              // flex 列布局：标题区固定，包裹层 flex:1 占满剩余高度，供子页面 h-full 填充
+              display: "flex",
+              flexDirection: "column",
             }}
           >
-            {/* 标题区：有 backHref 时渲染「返回列表」按钮，否则渲染可选的页面标题 */}
-            {backHref ? (
-              // 返回模式：标题区是一个「返回列表」按钮，替代纯文本标题
-              <Button
-                type="link"
-                icon={<ArrowLeftOutlined />}
-                onClick={() => router.push(backHref)}
-                style={{ paddingInline: 0, fontWeight: 600, fontSize: 18 }}
-              >
-                返回列表
-              </Button>
-            ) : (
-              title && (
-                <Typography.Title
-                  level={4}
-                  style={{ marginTop: 0, marginBottom: 4 }}
-                >
-                  {title}
-                </Typography.Title>
-              )
+            {/* 页头插槽：内容由页面自行组合（PageHeader / 自定义节点），高度随内容收缩 */}
+            {header && (
+              <div className="shrink-0 self-start">{header}</div>
             )}
-            {description && (
-              <Typography.Text type="secondary"> {description}</Typography.Text>
-            )}
-            <div style={{ height: "100%" }}>{children}</div>
+            <div className={contentClassName} style={{ flex: 1, minHeight: 0 }}>
+              {children}
+            </div>
           </Content>
         </Layout>
       </Layout>

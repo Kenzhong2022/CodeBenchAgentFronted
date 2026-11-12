@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Button, Card, Input, Space, Spin, Typography, theme } from "antd";
 import { ReloadOutlined } from "@ant-design/icons";
 import PageLayout from "@/components/PageLayout";
+import PageHeader from "@/components/PageHeader";
 
 // 全局 token 的首段前缀：这些变量不属于任何组件，定义在全局作用域
 const GLOBAL_SEGMENTS = new Set([
@@ -144,8 +145,12 @@ export default function CssVarsPage() {
 
   return (
     <PageLayout
-      title="CSS 变量"
-      description="antd 注入的 --ant-* CSS 变量实时浏览器，可在自定义样式与内联样式中直接引用"
+      header={
+        <PageHeader
+          title="CSS 变量"
+          description="antd 注入的 --ant-* CSS 变量实时浏览器，可在自定义样式与内联样式中直接引用"
+        />
+      }
     >
       {/* 说明区 */}
       <Card size="small" title="说明" className="mb-4">
