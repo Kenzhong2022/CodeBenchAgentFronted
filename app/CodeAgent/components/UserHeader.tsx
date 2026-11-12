@@ -39,32 +39,34 @@ export default function UserHeader() {
 
   return (
     <div
-      className="flex flex-col items-center gap-3 rounded-xl p-4"
+      className="flex flex-row items-center gap-3 rounded-xl p-4"
       style={{ background: "var(--ant-color-bg-container)" }}
     >
       <ExperienceAvatar raw={exp} rawMax={XP_MAX} size={160} />
-      <Typography.Title
-        level={4}
-        style={{ color: "var(--ant-color-text)", margin: 0 }}
-      >
-        用户名称：张三
-      </Typography.Title>
-      <Typography.Paragraph
-        style={{
-          color: "var(--ant-color-text-description)",
-          fontSize: 12,
-          margin: 0,
-        }}
-      >
-        Level {level} {exp}/{XP_MAX}
-      </Typography.Paragraph>
-      <Space size={24}>
-        <Link href="/CodeAgent?tab=problems">
-          <Button type="primary" ghost icon={<RocketOutlined />}>
-            个人中心
-          </Button>
-        </Link>
-      </Space>
+      <div className="flex flex-col justify-center gap-2">
+        <Typography.Title
+          level={4}
+          style={{ color: "var(--ant-color-text)", margin: 0 }}
+        >
+          张三
+        </Typography.Title>
+        <Typography.Paragraph
+          style={{
+            color: "var(--ant-color-text-description)",
+            fontSize: 12,
+            margin: 0,
+          }}
+        >
+          Level {level} {exp}/{XP_MAX}
+        </Typography.Paragraph>
+        <Space size={24}>
+          <Link href="/CodeAgent?tab=problems">
+            <Button type="primary" ghost icon={<RocketOutlined />}>
+              个人中心
+            </Button>
+          </Link>
+        </Space>
+      </div>
     </div>
   );
 }

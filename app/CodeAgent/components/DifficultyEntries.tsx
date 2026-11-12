@@ -44,7 +44,7 @@ const DIFFICULTY_ENTRIES = [
 export default function DifficultyEntries() {
   const { token } = theme.useToken();
   return (
-    <Card title="Difficulty">
+    <Card title="难度级别">
       {/* 用 antd Listy（List 已废弃）渲染难度入口：styles.item 清零默认内边距
           与底部分隔线，间距与条目样式统一交给 .difficulty-entry */}
       <Listy
@@ -55,35 +55,14 @@ export default function DifficultyEntries() {
         itemRender={(entry) => (
           <Link
             href={`/CodeAgent?tab=problems&difficulty=${entry.label}`}
-            // .link-reset 现在是 all: unset（压过 Tailwind 工具类），布局样式全部改由
-            // .difficulty-entry 提供，取值统一来自 antd token（见下方 style jsx global）
             className="difficulty-entry"
-            // 背景用真实色值；同时把该颜色挂为 CSS 变量，hover 光晕据此变色
-            style={
-              {
-                backgroundColor: "var(--ant-btn-bg-color)",
-                color: "var(--ant-color-text)",
-                // hover 光晕依赖此变量（见下方 .difficulty-entry:hover）
-                "--entry-color": entry.color,
-              } as React.CSSProperties
-            }
           >
             {/* 难度名用 Tag，预设色由 TAG_COLOR_MAP 配置映射决定 */}
             <Tag color={TAG_COLOR_MAP[entry.label]}>{entry.label}</Tag>
-            <Typography.Text
-              style={{
-                color: "var(--ant-color-text-description)",
-                fontSize: "var(--ant-font-size-sm)",
-              }}
-            >
+            <Typography.Text className="entry-desc">
               {entry.description}
             </Typography.Text>
-            <Typography.Text
-              style={{
-                color: "var(--ant-color-text-description)",
-                marginLeft: "auto",
-              }}
-            >
+            <Typography.Text className="entry-arrow">
               <ArrowRightOutlined />
             </Typography.Text>
           </Link>
@@ -104,14 +83,25 @@ export default function DifficultyEntries() {
           text-decoration: none;
           cursor: pointer;
           transition: all ${token.motionDurationMid} ${token.motionEaseOut};
+          border-bottom: 1px solid var(--ant-color-border);
+        }
+
+        /* 子元素默认色 + hover 联动：后代选择器 (0,2,0) 压过 antd 的 .ant-typography (0,1,0)，
+           :hover 变体 (0,3,0) 再压过默认规则；箭头用 margin-left:auto 顶到行尾 */
+        .difficulty-entry .entry-desc {
+          color: var(--ant-color-text-description);
+          font-size: var(--ant-font-size-sm);
+        }
+        .difficulty-entry .entry-arrow {
+          color: var(--ant-color-text-description);
+          margin-left: auto;
         }
         .difficulty-entry:hover {
-          filter: brightness(1.1);
-          /* 光晕颜色取自元素自身的 --entry-color（绿/橙/红各不相同），
-             color-mix 掺入透明度模拟 token 的柔和阴影，随主题切换无需额外变量 */
-          box-shadow: 0 6px 16px 0
-            color-mix(in srgb, var(--entry-color) 45%, transparent);
-          background-color: var(--ant-btn-bg-color);
+          color: var(--ant-color-primary);
+        }
+        .difficulty-entry:hover .entry-desc,
+        .difficulty-entry:hover .entry-arrow {
+          color: var(--ant-color-primary);
         }
       `}</style>
     </Card>

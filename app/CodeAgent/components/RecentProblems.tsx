@@ -2,7 +2,11 @@
 
 import Link from "next/link";
 import { Alert, Button, Card, Space, Spin, Tag, Typography } from "antd";
-import { ArrowRightOutlined, ReloadOutlined } from "@ant-design/icons";
+import {
+  ArrowRightOutlined,
+  ReloadOutlined,
+  RightCircleOutlined,
+} from "@ant-design/icons";
 
 /**
  * @description 首页下部最近题目卡片：由父组件传入取数结果，本组件只负责渲染
@@ -80,7 +84,7 @@ export default function RecentProblems({
             <Link
               key={item.id}
               href={`/CodeAgent/practice?id=${item.id}`}
-              className="flex items-center justify-between rounded-lg border border-zinc-200 px-4 py-2 transition-colors hover:border-blue-400 hover:bg-blue-50 dark:border-zinc-700 dark:hover:border-blue-500 dark:hover:bg-blue-950"
+              className="flex items-center justify-between  px-4 py-2 border-b border-b-(--ant-color-border)"
             >
               <Space wrap size={8}>
                 <span className="font-medium">
@@ -95,9 +99,8 @@ export default function RecentProblems({
                   </Tag>
                 ) : null}
               </Space>
-              <Typography.Text type="secondary">
-                {item.dataset_name ?? ""}
-              </Typography.Text>
+
+              <RightCircleOutlined style={{ fontSize: 24 }} />
             </Link>
           ))}
         </Space>

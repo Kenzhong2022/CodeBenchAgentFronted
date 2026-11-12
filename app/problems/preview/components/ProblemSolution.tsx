@@ -15,7 +15,7 @@ export default function ProblemSolution({
         题解
       </Typography.Title>
       {referenceCode.trim() ? (
-        <pre className="overflow-x-auto rounded-lg bg-zinc-100 p-4 font-mono text-[13px] leading-6 text-zinc-800 dark:bg-zinc-800 dark:text-zinc-200">
+        <pre className="overflow-x-auto rounded-lg bg-(--ant-color-fill-tertiary) p-4 font-mono text-[13px] leading-6 text-(--ant-color-text)">
           {referenceCode}
         </pre>
       ) : (

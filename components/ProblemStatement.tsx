@@ -30,7 +30,7 @@ const DIFFICULTY_META: Record<string, { label: string; color: string }> = {
 // 行内代码样式
 function InlineCode({ children }: { children?: ReactNode }) {
   return (
-    <code className="rounded bg-zinc-100 px-1.5 py-0.5 font-mono text-[0.88em] text-zinc-800 dark:bg-zinc-800 dark:text-zinc-200">
+    <code className="rounded bg-(--ant-color-fill-tertiary) px-1.5 py-0.5 font-mono text-[0.88em] text-(--ant-color-text)">
       {children}
     </code>
   );
@@ -43,7 +43,7 @@ const markdownComponents = {
   ),
   pre: ({ children }: { children?: ReactNode }) => (
     <pre
-      className="overflow-x-auto rounded bg-zinc-100 p-3 font-mono text-[13px] leading-6 text-zinc-800 dark:bg-zinc-800 dark:text-zinc-200"
+      className="overflow-x-auto rounded bg-(--ant-color-fill-tertiary) p-3 font-mono text-[13px] leading-6 text-(--ant-color-text)"
       style={{ margin: "12px 0" }}
     >
       {children}
@@ -56,7 +56,7 @@ const markdownComponents = {
       <InlineCode>{children}</InlineCode>
     ),
   a: ({ children, href }: { children?: ReactNode; href?: string }) => (
-    <a href={href} target="_blank" rel="noreferrer" className="text-blue-600 underline dark:text-blue-400">
+    <a href={href} target="_blank" rel="noreferrer" className="text-(--ant-color-primary) underline">
       {children}
     </a>
   ),
@@ -65,7 +65,7 @@ const markdownComponents = {
 // 输入/输出值的代码样式展示
 function CodeChip({ children }: { children: ReactNode }) {
   return (
-    <code className="rounded bg-zinc-100 px-1.5 py-0.5 font-mono text-[13px] text-zinc-800 dark:bg-zinc-800 dark:text-zinc-200">
+    <code className="rounded bg-(--ant-color-fill-tertiary) px-1.5 py-0.5 font-mono text-[13px] text-(--ant-color-text)">
       {children}
     </code>
   );
@@ -100,7 +100,7 @@ export default function ProblemStatement({ problem }: { problem: PreviewProblem 
       </div>
 
       {/* 题目描述（Markdown） */}
-      <div className="mt-6 text-[15px] leading-7 text-zinc-900 dark:text-zinc-100">
+      <div className="mt-6 text-[15px] leading-7 text-(--ant-color-text)">
         <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
           {problem.prompt ?? ""}
         </ReactMarkdown>
@@ -109,8 +109,8 @@ export default function ProblemStatement({ problem }: { problem: PreviewProblem 
       {/* 测试用例（断言形式） */}
       {testCases.length > 0 && (
         <div className="mt-8">
-          <div className="font-semibold text-zinc-900 dark:text-zinc-100">测试用例：</div>
-          <div className="mt-3 flex flex-col gap-2 border-l-2 border-zinc-200 pl-4 dark:border-zinc-700">
+          <div className="font-semibold text-(--ant-color-text)">测试用例：</div>
+          <div className="mt-3 flex flex-col gap-2 border-l-2 border-(--ant-color-border-secondary) pl-4">
             {testCases.map((testCase, index) => (
               <div key={index}>
                 <CodeChip>{String(testCase)}</CodeChip>

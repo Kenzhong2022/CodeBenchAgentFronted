@@ -200,7 +200,7 @@ function PracticeSection() {
         <Splitter>
           {/* 左侧：题面，独立滚动，可拖拽调宽 */}
           <Splitter.Panel defaultSize="42%" min="28%" max="60%">
-            <div className="h-full overflow-y-auto pr-3">
+            <div className="h-full overflow-y-auto pr-3 bg-(--ant-color-bg-container) ">
               <ProblemStatement problem={problem} />
             </div>
           </Splitter.Panel>
@@ -210,7 +210,7 @@ function PracticeSection() {
             <Splitter orientation="vertical">
               {/* 上：语言栏 + 代码编辑器 */}
               <Splitter.Panel defaultSize="58%" min="30%" max="80%">
-                <div className="flex h-full flex-col gap-2 pl-3 pb-3">
+                <div className="flex h-full flex-col gap-2 bg-(--ant-color-bg-container) p-3">
                   <div className="flex items-center justify-between">
                     <Select
                       size="small"
@@ -254,7 +254,7 @@ function PracticeSection() {
 
               {/* 下：测试用例 / 测试结果 双 Tab 面板 */}
               <Splitter.Panel min="20%" max="70%">
-                <div className="h-full overflow-y-auto pl-3">
+                <div className="h-full overflow-y-auto bg-(--ant-color-bg-container) pt-3 pl-3">
                   <Tabs
                     activeKey={panelTab}
                     onChange={setPanelTab}
@@ -275,7 +275,7 @@ function PracticeSection() {
                                 key: String(index),
                                 label: `Case ${index + 1}`,
                                 children: (
-                                  <pre className="overflow-x-auto rounded-lg bg-zinc-100 p-3 font-mono text-[13px] leading-6 text-zinc-800 dark:bg-zinc-800 dark:text-zinc-200">
+                                  <pre className="overflow-x-auto rounded-lg bg-(--ant-color-fill-tertiary) p-3 font-mono text-[13px] leading-6 text-(--ant-color-text)">
                                     {String(testCase)}
                                   </pre>
                                 ),
@@ -298,37 +298,41 @@ function PracticeSection() {
                               {caseResults.map((result, index) => (
                                 <div
                                   key={index}
-                                  className="rounded-lg border border-zinc-200 p-2 dark:border-zinc-700"
+                                  className="rounded-lg border border-(--ant-color-border-secondary) p-2"
                                 >
                                   <div className="flex items-center gap-2 text-[13px]">
                                     <Tag
-                                      color={result.passed ? "success" : "error"}
+                                      color={
+                                        result.passed ? "success" : "error"
+                                      }
                                       style={{ marginInlineEnd: 0 }}
                                     >
                                       {result.passed ? "通过" : "失败"}
                                     </Tag>
-                                    <span className="font-medium">Case {index + 1}</span>
+                                    <span className="font-medium">
+                                      Case {index + 1}
+                                    </span>
                                   </div>
                                   {!result.passed && result.error && (
-                                    <pre className="mt-2 overflow-x-auto whitespace-pre-wrap rounded bg-zinc-100 p-2 font-mono text-[12px] leading-5 text-zinc-800 dark:bg-zinc-800 dark:text-zinc-200">
+                                    <pre className="mt-2 overflow-x-auto whitespace-pre-wrap rounded bg-(--ant-color-fill-tertiary) p-2 font-mono text-[12px] leading-5 text-(--ant-color-text)">
                                       {result.error}
                                     </pre>
                                   )}
                                 </div>
                               ))}
-                              <div className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                              <div className="mt-1 text-xs text-(--ant-color-text-description)">
                                 控制台输出
                               </div>
-                              <pre className="max-h-40 overflow-auto rounded-lg bg-zinc-950 p-3 font-mono text-[13px] leading-6 text-zinc-100">
+                              <pre className="max-h-40 overflow-auto rounded-lg border border-(--ant-color-border-secondary) bg-(--ant-color-bg-layout) p-3 font-mono text-[13px] leading-6 text-(--ant-color-text)">
                                 {output ?? "(无输出)"}
                               </pre>
                             </div>
                           ) : output !== null ? (
-                            <pre className="max-h-56 overflow-auto rounded-lg bg-zinc-950 p-3 font-mono text-[13px] leading-6 text-zinc-100">
+                            <pre className="max-h-56 overflow-auto rounded-lg border border-(--ant-color-border-secondary) bg-(--ant-color-bg-layout) p-3 font-mono text-[13px] leading-6 text-(--ant-color-text)">
                               {output}
                             </pre>
                           ) : (
-                            <div className="py-8 text-center text-xs text-zinc-500 dark:text-zinc-400">
+                            <div className="py-8 text-center text-xs text-(--ant-color-text-description)">
                               点击「运行」逐个执行测试用例，这里展示每个用例的通过情况与输出
                             </div>
                           ),

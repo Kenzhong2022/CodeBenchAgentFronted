@@ -64,12 +64,12 @@ function PreviewSection() {
   }
   // 左右布局：左侧题面，右侧参考题解；窄屏时上下堆叠
   return (
-    <div className="flex min-h-screen flex-col bg-white dark:bg-zinc-950 lg:flex-row">
+    <div className="flex min-h-screen flex-col bg-(--ant-color-bg-container) lg:flex-row">
       {/* 左侧：题面 */}
       <ProblemStatement problem={problem} />
 
       {/* 右侧：参考题解（Agent 生成），固定宽度、独立滚动 */}
-      <aside className="w-full shrink-0 border-t border-zinc-200 px-6 py-10 dark:border-zinc-800 lg:sticky lg:top-0 lg:h-screen lg:w-[400px] lg:overflow-y-auto lg:border-l lg:border-t-0">
+      <aside className="w-full shrink-0 border-t border-(--ant-color-border-secondary) px-6 py-10 lg:sticky lg:top-0 lg:h-screen lg:w-[400px] lg:overflow-y-auto lg:border-l lg:border-t-0">
         <ProblemSolution referenceSolution={problem.reference_solution} />
       </aside>
     </div>
