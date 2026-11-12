@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, startTransition } from "react";
 
 /** 主题模式：亮色 / 暗色 / 跟随系统 */
 export type ThemeMode = "light" | "dark" | "system";
@@ -41,8 +41,14 @@ export function useThemeMode() {
 
   const refresh = useCallback(() => {
     const m = getThemeMode();
-    setModeState(m);
-    setDark(resolveDark(m));
+    // 用 transition 标记主题切换：流式 SSR 下该 effect 可能在部分 Suspense
+    // 边界（如 useSearchParams 包裹的内容）完成水合之前触发，若用默认紧急
+    // 更新，React 会带着暗色 token 去水合服务端渲染的亮色 HTML，产生
+    // hydration mismatch。transition 保证 React 先完成水合，再应用主题。
+    startTransition(() => {
+      setModeState(m);
+      setDark(resolveDark(m));
+    });
   }, []);
 
   useEffect(() => {
