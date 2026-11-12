@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import dayjs from "dayjs";
-import { Alert, Button, Empty, List, Segmented, Select, Space, Spin, Tag, Typography } from "antd";
+import { Alert, Button, Empty, Listy, Segmented, Select, Space, Spin, Tag, Typography } from "antd";
 import { ReloadOutlined } from "@ant-design/icons";
 
 /**
@@ -188,49 +188,43 @@ export default function ProblemList({
       {items.length === 0 ? (
         <Empty description="暂无题目" />
       ) : (
-        <List
-          dataSource={items}
-          renderItem={(item) => (
-            <List.Item
-              actions={[
-                <a
-                  key="open"
-                  href={
-                    itemHref
-                      ? itemHref(item)
-                      : `/problems/preview?id=${item.id}`
-                  }
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  {actionLabel}
-                </a>,
-              ]}
-            >
-              <List.Item.Meta
-                title={
-                  <Space wrap size={8}>
-                    <span>#{item.id}</span>
-                    <span>{item.title || `题目 #${item.id}`}</span>
-                    {item.difficulty && DIFFICULTY_COLORS[item.difficulty] ? (
-                      <Tag color={DIFFICULTY_COLORS[item.difficulty]} style={{ marginInlineEnd: 0 }}>
-                        {item.difficulty}
-                      </Tag>
-                    ) : null}
-                    {[item.dataset_name, item.subset].filter(Boolean).join(" / ") && (
-                      <Tag style={{ marginInlineEnd: 0 }}>
-                        {[item.dataset_name, item.subset].filter(Boolean).join(" / ")}
-                      </Tag>
-                    )}
-                  </Space>
-                }
-                description={
-                  item.created_at
-                    ? `创建于 ${dayjs(item.created_at).format("YYYY-MM-DD HH:mm")}`
-                    : undefined
-                }
-              />
-            </List.Item>
+        <Listy
+          items={items}
+          rowKey={(item) => item.id}
+          itemRender={(item) => (
+            /* 行内布局自拼：左侧标题 + 标签与创建时间，右侧操作链接；
+               内边距 / 分隔线 / hover 由 Listy 默认样式提供 */
+            <div className="flex items-center gap-4">
+              <div className="flex min-w-0 flex-col gap-1">
+                <Space wrap size={8}>
+                  <span>#{item.id}</span>
+                  <span className="truncate">{item.title || `题目 #${item.id}`}</span>
+                  {item.difficulty && DIFFICULTY_COLORS[item.difficulty] ? (
+                    <Tag color={DIFFICULTY_COLORS[item.difficulty]} style={{ marginInlineEnd: 0 }}>
+                      {item.difficulty}
+                    </Tag>
+                  ) : null}
+                  {[item.dataset_name, item.subset].filter(Boolean).join(" / ") && (
+                    <Tag style={{ marginInlineEnd: 0 }}>
+                      {[item.dataset_name, item.subset].filter(Boolean).join(" / ")}
+                    </Tag>
+                  )}
+                </Space>
+                {item.created_at && (
+                  <Typography.Text type="secondary">
+                    创建于 {dayjs(item.created_at).format("YYYY-MM-DD HH:mm")}
+                  </Typography.Text>
+                )}
+              </div>
+              <a
+                href={itemHref ? itemHref(item) : `/problems/preview?id=${item.id}`}
+                target="_blank"
+                rel="noreferrer"
+                className="shrink-0"
+              >
+                {actionLabel}
+              </a>
+            </div>
           )}
         />
       )}
