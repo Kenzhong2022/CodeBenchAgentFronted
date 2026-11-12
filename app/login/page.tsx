@@ -61,12 +61,12 @@ function LoginView() {
   return (
     <div className="flex min-h-screen bg-white">
       {/* 左侧品牌面板：移动端隐藏 */}
-      <div className="relative hidden w-3/5 overflow-hidden md:block">
+      <div className="relative hidden h-screen aspect-3/4 overflow-hidden md:block">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src="/login_bg.jpg"
           alt=""
-          className="absolute inset-0 h-full w-full object-cover"
+          className="absolute inset-0 h-full w-full object-fill"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-black/10 to-black/30" />
         <div className="absolute top-8 left-10 text-2xl font-bold tracking-tight text-white">
@@ -86,7 +86,7 @@ function LoginView() {
       </div>
 
       {/* 右侧登录表单 */}
-      <div className="flex w-full items-center justify-center px-8 md:w-2/5">
+      <div className="flex-1 flex w-full items-center justify-center px-8 md:w-2/5">
         <div className="w-full max-w-[400px] py-16">
           <h1 className="mb-8 text-2xl font-bold text-gray-900">
             登录 CodeBench
@@ -110,7 +110,10 @@ function LoginView() {
               name="password"
               rules={[{ required: true, message: "请输入密码" }]}
             >
-              <Input.Password placeholder="密码" autoComplete="current-password" />
+              <Input.Password
+                placeholder="密码"
+                autoComplete="current-password"
+              />
             </Form.Item>
 
             {/* submit 按钮 */}
