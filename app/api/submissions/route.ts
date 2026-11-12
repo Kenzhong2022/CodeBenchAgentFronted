@@ -38,6 +38,17 @@ function sanitize(body: unknown): { row?: Record<string, unknown>; error?: strin
     }
     row.status = status;
   }
+  if (source.pass !== undefined) {
+    // 浏览器端测试集跑完后的总体通过结果（布尔）
+    if (typeof source.pass !== "boolean") {
+      return { error: "pass 必须是布尔值" };
+    }
+    row.pass = source.pass;
+  }
+  if (source.error_reason !== undefined) {
+    // 未通过时的失败原因：编译错误或首个失败用例的报错
+    row.error_reason = String(source.error_reason);
+  }
   if (source.agent_report !== undefined) {
     row.agent_report = String(source.agent_report);
   }
