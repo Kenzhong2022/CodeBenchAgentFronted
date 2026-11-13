@@ -5,7 +5,8 @@ import { NextResponse } from "next/server";
  */
 // Worker 运行时模块加载阶段拿不到请求级环境变量，必须在请求时读取
 export function apiBase(): string {
-  return process.env.CODEBENCH_API_URL ?? "http://127.0.0.1:8000";
+  // return process.env.CODEBENCH_API_URL ?? "http://127.0.0.1:8000";
+  return process.env.CODEBENCH_API_URL ?? "https://codebenchagent.vercel.app";
 }
 
 /**
@@ -16,7 +17,7 @@ export function apiBase(): string {
  */
 export async function callPython(
   path: string,
-  init?: RequestInit
+  init?: RequestInit,
 ): Promise<{ ok: boolean; status: number; body: unknown }> {
   let res: Response;
   try {
@@ -26,7 +27,9 @@ export async function callPython(
     return {
       ok: false,
       status: 502,
-      body: { detail: `后端服务不可用（${apiBase()}），请确认 FastAPI 服务已启动` },
+      body: {
+        detail: `后端服务不可用（${apiBase()}），请确认 FastAPI 服务已启动`,
+      },
     };
   }
   const body = await res.json().catch(() => null);
@@ -41,7 +44,10 @@ export async function callPython(
  */
 export function errorResponse(status: number, body: unknown): NextResponse {
   const detail = (body as { detail?: string } | null)?.detail;
-  return NextResponse.json({ error: detail ?? "Python 服务端请求失败" }, { status });
+  return NextResponse.json(
+    { error: detail ?? "Python 服务端请求失败" },
+    { status },
+  );
 }
 
 /**
