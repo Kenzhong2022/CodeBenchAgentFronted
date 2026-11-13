@@ -1,18 +1,47 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Alert, Button, Divider, Space, Spin, Typography, Tooltip } from "antd";
-import { LeftOutlined, RightOutlined } from "@ant-design/icons";
+import { Alert, Button, Divider, Spin, Typography, Tooltip, theme } from "antd";
+import {
+  LeftOutlined,
+  RightOutlined,
+  MenuUnfoldOutlined,
+} from "@ant-design/icons";
 import PageLayout from "@/components/PageLayout";
 import PageHeader from "@/components/PageHeader";
 import type { PreviewProblem } from "@/components/ProblemStatement";
 import PracticeWorkbench from "./PracticeWorkbench";
 
+/**
+ * 主题 token 驱动的导航链接：默认 colorLink 文字，悬停切换为
+ * colorLinkHover 文字 + colorBgTextHover 填充背景；
+ * 内联样式写不了 :hover 伪类，用组件自身 hover 状态切换
+ */
+function TokenLink({ href, children }: { href: string; children: ReactNode }) {
+  const { token } = theme.useToken();
+  const [hovered, setHovered] = useState(false);
+  return (
+    <Link
+      href={href}
+      className="inline-flex items-center p-2 text-[13px] "
+      style={{
+        color: token.colorText,
+        backgroundColor: hovered ? token.colorBgTextHover : "transparent",
+      }}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+    >
+      {children}
+    </Link>
+  );
+}
+
 // CodeAgent 练习页主体：按 URL 中的 id 从题库接口拉取题目，展示与预览页一致的题面布局
 function PracticeSection() {
   const searchParams = useSearchParams();
+  const { token } = theme.useToken();
   // 当前题目 id 完全由 URL 驱动：上一题 / 下一题是真实的 <a> 链接（?id=N），
   // 点击即路由切换，地址栏与实际题目始终一致，刷新 / 分享 / 中键新开均可
   const id = searchParams.get("id");
@@ -25,58 +54,91 @@ function PracticeSection() {
   // 是否有题目请求在途：切题时工作台保持挂载显示旧题，仅盖遮罩提示；
   // problem === undefined 仅表示首次进入尚未加载过任何题目
   const [fetching, setFetching] = useState(false);
+  // 头部导航条悬停态：移入时在三个按钮之间显示纵向分割线
+  const [navHovered, setNavHovered] = useState(false);
 
   /** @description 当前题目的数字 id（用于上一题 / 下一题的边界判断） */
   const problemId = id ? Number(id) : null;
 
-  /**
-   * @description 上一题 / 下一题链接样式：可用时渲染 <Link>（主题色 + hover 变色），
-   *              越界或无 id 时渲染灰色占位 span（不可点），两者宽度形态一致不跳动
-   */
-
-  // 头部导航：上一题 / 下一题，Space 用竖分隔符隔开；链接始终可点，
-  // 连续切换由 effect 的 cancelled 标记丢弃过期响应，不会产生结果错乱
-  const navLinkClass =
-    "inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[13px] transition-colors hover:bg-(--ant-button-link-hover-bg) hover:text-(--ant-btn-text-color-hover)";
-  const navDisabledClass =
-    "inline-flex items-center gap-1 text-[13px] text-(--ant-color-text-quaternary) cursor-not-allowed";
+  // 头部导航：返回列表 / 上一题 / 下一题；链接始终可点，连续切换由
+  // effect 的 cancelled 标记丢弃过期响应，不会产生结果错乱。
+  // 可用项用 TokenLink（token 配色 + hover 反馈），越界 / 无 id 时渲染
+  // 灰色占位（不可点），两者宽度形态一致不跳动
+  const navDisabledStyle = {
+    color: token.colorTextQuaternary,
+    fontSize: 13,
+    gap: 4,
+  };
   const navExtra = (
-    <Space>
+    <div
+      style={{
+        width: "fit-content",
+        color: token.colorText,
+        overflow: "hidden",
+        backgroundColor: navHovered ? token.colorFillContent : "transparent",
+      }}
+      className={`rounded-lg overflow-hidden mb-2 cursor-pointer transition-colors flex items-center`}
+      onMouseEnter={() => setNavHovered(true)}
+      onMouseLeave={() => setNavHovered(false)}
+    >
+      <Tooltip title="返回题目列表">
+        <TokenLink href="/CodeAgent/problems">
+          <MenuUnfoldOutlined />
+        </TokenLink>
+      </Tooltip>
+      {/* 纵向分割线：悬停时显现（Tailwind 类名需为字面量，动态拼接扫不到，故用 token 内联样式） */}
+      <div
+        className="w-px self-stretch transition-colors"
+        style={{
+          backgroundColor: navHovered ? token.colorBorderBg : "transparent",
+        }}
+      />
       <Tooltip title={problemId && problemId > 1 ? "上一题" : "无上一题"}>
         {problemId && problemId > 1 ? (
-          <Link
-            href={`/CodeAgent/practice?id=${problemId - 1}`}
-            className={navLinkClass}
-          >
+          <TokenLink href={`/CodeAgent/practice?id=${problemId - 1}`}>
             <LeftOutlined />
-          </Link>
+          </TokenLink>
         ) : (
-          <div className={navDisabledClass}>
+          <div
+            className="inline-flex items-center cursor-not-allowed"
+            style={navDisabledStyle}
+          >
             <LeftOutlined />
           </div>
         )}
       </Tooltip>
-
+      <div
+        className="w-px self-stretch transition-colors"
+        style={{
+          backgroundColor: navHovered ? token.colorBorderBg : "transparent",
+        }}
+      />
       <Tooltip title={problemId ? "下一题" : "无下一题"}>
         {problemId ? (
-          <Link
-            href={`/CodeAgent/practice?id=${problemId + 1}`}
-            className={navLinkClass}
-          >
+          <TokenLink href={`/CodeAgent/practice?id=${problemId + 1}`}>
             <RightOutlined />
-          </Link>
+          </TokenLink>
         ) : (
-          <div className={navDisabledClass}>
+          <div
+            className="inline-flex items-center cursor-not-allowed"
+            style={navDisabledStyle}
+          >
             <RightOutlined />
           </div>
         )}
       </Tooltip>
-    </Space>
+    </div>
   );
 
   // 加载遮罩：半透明盖在当前内容上（工作台 / 错误提示），不卸载旧内容、避免切题闪烁
   const loadingOverlay = fetching ? (
-    <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-(--ant-color-bg-container)/60">
+    <div
+      className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3"
+      style={{
+        // 60% 透明度的主题容器色（color-mix 取代 CSS 变量 /60 写法）
+        backgroundColor: `color-mix(in srgb, ${token.colorBgContainer} 60%, transparent)`,
+      }}
+    >
       <Spin size="large" />
       <Typography.Text type="secondary">正在加载题目…</Typography.Text>
     </div>
@@ -147,7 +209,7 @@ function PracticeSection() {
           <Alert
             type="error"
             showIcon
-            message={error ?? "未找到题目数据"}
+            title={error ?? "未找到题目数据"}
             description="请从 CodeAgent 题库列表重新进入。"
             action={
               <Button size="small" onClick={() => setReloadTick((t) => t + 1)}>
@@ -163,10 +225,8 @@ function PracticeSection() {
   return (
     <PageLayout
       // 工作台模式：内容区不随页面滚动（Splitter 内部各自滚动），高度填满标题区以下剩余空间
-      contentClassName="overflow-hidden"
-      header={
-        <PageHeader backHref="/CodeAgent?tab=problems" extra={navExtra} />
-      }
+      contentClassName="overflow-hidden rounded-tr-lg bg-(--ant-color-bg-container)"
+      header={<PageHeader extra={navExtra} />}
     >
       {/* 切题时工作台保持挂载显示旧题（key 未变不重建），请求在途由遮罩提示；
           新数据到达后 key 变化触发销毁重建，代码 / 输出 / 用例结果等状态自动归零 */}

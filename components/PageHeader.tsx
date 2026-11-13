@@ -27,27 +27,30 @@ export default function PageHeader({
   const router = useRouter();
   return (
     <div className="hover:bg-(--ant-button-link-hover-bg) rounded-md">
-      {backHref ? (
+      {(backHref || extra) && (
         <Space size={8}>
-          <Button
-            type="link"
-            icon={<ArrowLeftOutlined />}
-            onClick={() => router.push(backHref)}
-            style={{ paddingInline: 0, fontWeight: 600, fontSize: 18 }}
-          >
-            返回列表
-          </Button>
+          {backHref && (
+            <Button
+              type="link"
+              icon={<ArrowLeftOutlined />}
+              onClick={() => router.push(backHref)}
+              style={{ paddingInline: 0, fontWeight: 600, fontSize: 18 }}
+            >
+              返回列表
+            </Button>
+          )}
           {extra}
         </Space>
-      ) : (
-        title && (
-          <Typography.Title level={4} style={{ marginTop: 0, marginBottom: 4 }}>
-            {title}
-          </Typography.Title>
-        )
       )}
+
+      {title && (
+        <Typography.Title level={4} style={{ marginTop: 0, marginBottom: 4 }}>
+          {title}
+        </Typography.Title>
+      )}
+
       {description && (
-        <Typography.Text type="secondary"> {description}</Typography.Text>
+        <Typography.Text type="secondary">{description}</Typography.Text>
       )}
     </div>
   );

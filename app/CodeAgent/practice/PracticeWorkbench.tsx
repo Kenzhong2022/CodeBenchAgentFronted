@@ -12,11 +12,7 @@ import type { PreviewProblem } from "@/components/ProblemStatement";
 import ProblemStatement from "@/components/ProblemStatement";
 import CodeEditor, { type EditorLanguage } from "@/components/CodeEditor";
 import { getSessionUser } from "@/lib/session";
-import {
-  DEFAULT_CODE,
-  runInPyodide,
-  type CaseResult,
-} from "./runTests";
+import { DEFAULT_CODE, runInPyodide, type CaseResult } from "./runTests";
 
 /**
  * @description 练习页工作台：LeetCode 式左右 Splitter（题面 | 工作台），
@@ -68,7 +64,12 @@ export default function PracticeWorkbench({
     setCaseResults(null);
     writeOutput("正在加载 Python 环境并执行…");
     try {
-      const report = await runInPyodide(problem, code, appendOutput, appendOutput);
+      const report = await runInPyodide(
+        problem,
+        code,
+        appendOutput,
+        appendOutput,
+      );
       if (report.compile_error) {
         writeOutput(`运行报错:\n${report.compile_error}`);
       } else {
@@ -103,7 +104,12 @@ export default function PracticeWorkbench({
     setCaseResults(null);
     writeOutput("正在加载 Python 环境并执行测试集…");
     try {
-      const report = await runInPyodide(problem, code, appendOutput, appendOutput);
+      const report = await runInPyodide(
+        problem,
+        code,
+        appendOutput,
+        appendOutput,
+      );
       if (report.compile_error) {
         writeOutput(`运行报错:\n${report.compile_error}`);
       } else {
@@ -137,7 +143,9 @@ export default function PracticeWorkbench({
         );
       }
       if (pass) {
-        message.success(`全部通过（${report.results.length} 个用例），提交记录已保存`);
+        message.success(
+          `全部通过（${report.results.length} 个用例），提交记录已保存`,
+        );
       } else {
         message.warning("未全部通过，提交记录已保存");
       }
@@ -155,7 +163,7 @@ export default function PracticeWorkbench({
       <Splitter>
         {/* 左侧：题面，独立滚动，可拖拽调宽 */}
         <Splitter.Panel defaultSize="42%" min="28%" max="60%">
-          <div className="h-full overflow-y-auto pr-3 bg-(--ant-color-bg-container) ">
+          <div className="h-full overflow-y-auto pr-3 bg-(--ant-color-bg-container)">
             <ProblemStatement problem={problem} />
           </div>
         </Splitter.Panel>
@@ -257,9 +265,7 @@ export default function PracticeWorkbench({
                               >
                                 <div className="flex items-center gap-2 text-[13px]">
                                   <Tag
-                                    color={
-                                      result.passed ? "success" : "error"
-                                    }
+                                    color={result.passed ? "success" : "error"}
                                     style={{ marginInlineEnd: 0 }}
                                   >
                                     {result.passed ? "通过" : "失败"}
