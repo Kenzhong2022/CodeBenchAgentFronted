@@ -204,6 +204,7 @@ function PracticeSection() {
             extra={navExtra}
           />
         }
+        contentClassName="bg-(--ant-color-bg-container)"
       >
         <div className="relative">
           <Alert

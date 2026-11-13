@@ -73,9 +73,7 @@ export default function PageLayout({
             }}
           >
             {/* 页头插槽：内容由页面自行组合（PageHeader / 自定义节点），高度随内容收缩 */}
-            {header && (
-              <div className="shrink-0 self-start">{header}</div>
-            )}
+            {header && <div className="shrink-0 self-start">{header}</div>}
             <div className={contentClassName} style={{ flex: 1, minHeight: 0 }}>
               {children}
             </div>

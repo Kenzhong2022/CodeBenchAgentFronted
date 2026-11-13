@@ -14,6 +14,7 @@ export default function ProblemsPage() {
           description="游标分页浏览题库：按数据集筛选，逐页加载，点击条目查看题目详情。"
         />
       }
+      contentClassName="bg-(--ant-color-bg-container)"
     >
       <ProblemList />
     </PageLayout>

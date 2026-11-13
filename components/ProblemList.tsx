@@ -180,7 +180,7 @@ export default function ProblemList({
   }
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-4 overflow-hidden h-full">
       {/* 筛选区：语言分段控制 + 按数据集筛选，切换后从第一页重新加载 */}
       <Space wrap>
         <Segmented
@@ -207,56 +207,60 @@ export default function ProblemList({
       {items.length === 0 ? (
         <Empty description="暂无题目" />
       ) : (
-        <Listy
-          items={items}
-          rowKey={(item) => item.id}
-          itemRender={(item) => (
-            /* 行内布局自拼：左侧标题 + 标签与创建时间，右侧操作链接；
+        <div className="overflow-auto">
+          <Listy
+            items={items}
+            rowKey={(item) => item.id}
+            itemRender={(item) => (
+              /* 行内布局自拼：左侧标题 + 标签与创建时间，右侧操作链接；
                内边距 / 分隔线 / hover 由 Listy 默认样式提供 */
-            <div className="flex items-center gap-4">
-              <div className="flex min-w-0 flex-col gap-1">
-                <Space wrap size={8}>
-                  <span>#{item.id}</span>
-                  <span className="truncate">
-                    {item.title || `题目 #${item.id}`}
-                  </span>
-                  {item.difficulty && DIFFICULTY_COLORS[item.difficulty] ? (
-                    <Tag
-                      color={DIFFICULTY_COLORS[item.difficulty]}
-                      style={{ marginInlineEnd: 0 }}
-                    >
-                      {item.difficulty}
-                    </Tag>
-                  ) : null}
-                  {[item.dataset_name, item.subset]
-                    .filter(Boolean)
-                    .join(" / ") && (
-                    <Tag style={{ marginInlineEnd: 0 }}>
-                      {[item.dataset_name, item.subset]
-                        .filter(Boolean)
-                        .join(" / ")}
-                    </Tag>
+              <div className="flex items-center gap-4">
+                <div className="flex min-w-0 flex-col gap-1">
+                  <Space wrap size={8}>
+                    <span>#{item.id}</span>
+                    <span className="truncate">
+                      {item.title || `题目 #${item.id}`}
+                    </span>
+                    {item.difficulty && DIFFICULTY_COLORS[item.difficulty] ? (
+                      <Tag
+                        color={DIFFICULTY_COLORS[item.difficulty]}
+                        style={{ marginInlineEnd: 0 }}
+                      >
+                        {item.difficulty}
+                      </Tag>
+                    ) : null}
+                    {[item.dataset_name, item.subset]
+                      .filter(Boolean)
+                      .join(" / ") && (
+                      <Tag style={{ marginInlineEnd: 0 }}>
+                        {[item.dataset_name, item.subset]
+                          .filter(Boolean)
+                          .join(" / ")}
+                      </Tag>
+                    )}
+                  </Space>
+                  {item.created_at && (
+                    <Typography.Text type="secondary">
+                      创建于 {dayjs(item.created_at).format("YYYY-MM-DD HH:mm")}
+                    </Typography.Text>
                   )}
-                </Space>
-                {item.created_at && (
-                  <Typography.Text type="secondary">
-                    创建于 {dayjs(item.created_at).format("YYYY-MM-DD HH:mm")}
-                  </Typography.Text>
-                )}
+                </div>
+                <a
+                  href={
+                    itemHref
+                      ? itemHref(item)
+                      : `/problems/preview?id=${item.id}`
+                  }
+                  target="_blank"
+                  rel="noreferrer"
+                  className="shrink-0 ml-auto"
+                >
+                  {actionLabel}
+                </a>
               </div>
-              <a
-                href={
-                  itemHref ? itemHref(item) : `/problems/preview?id=${item.id}`
-                }
-                target="_blank"
-                rel="noreferrer"
-                className="shrink-0 ml-auto"
-              >
-                {actionLabel}
-              </a>
-            </div>
-          )}
-        />
+            )}
+          />
+        </div>
       )}
 
       {/* 加载更多：游标分页由服务端控制是否有下一页 */}

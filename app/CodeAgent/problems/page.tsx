@@ -14,6 +14,7 @@ export default function CodeAgentProblemsPage() {
           description="从题库中选择题目进入在线练习。"
         />
       }
+      contentClassName="bg-(--ant-color-bg-container) p-2"
     >
       <ProblemList
         itemHref={(item) => `/CodeAgent/practice?id=${item.id}`}
