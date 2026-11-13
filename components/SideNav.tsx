@@ -2,7 +2,7 @@
 
 import type { ReactNode } from "react";
 import { Layout, Menu, theme } from "antd";
-import { useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 
 type SideItem = { key: string; label: string; icon?: ReactNode };
 
@@ -17,9 +17,13 @@ export default function SideNav({
   collapsed: boolean;
 }) {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const tab = searchParams.get("tab");
-  const selectedKey = tab ? `${groupKey}?tab=${tab}` : items[0]?.key ?? groupKey;
+  // 子路由前缀匹配当前项（如 /CodeAgent/practice 归入 /CodeAgent/problems 不命中，
+  // 此时回退高亮第一项）；不再读取 ?tab= 查询参数
+  const pathname = usePathname();
+  const selectedKey =
+    items.find((item) => pathname.startsWith(item.key))?.key ??
+    items[0]?.key ??
+    groupKey;
   const { token } = theme.useToken();
 
   return (

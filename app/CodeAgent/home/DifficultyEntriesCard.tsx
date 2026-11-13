@@ -54,7 +54,7 @@ export default function DifficultyEntries() {
         styles={{ item: { padding: 0, borderBottom: "none" } }}
         itemRender={(entry) => (
           <Link
-            href={`/CodeAgent?tab=problems&difficulty=${entry.label}`}
+            href={`/CodeAgent/problems?difficulty=${entry.label}`}
             className="difficulty-entry"
           >
             {/* 难度名用 Tag，预设色由 TAG_COLOR_MAP 配置映射决定 */}

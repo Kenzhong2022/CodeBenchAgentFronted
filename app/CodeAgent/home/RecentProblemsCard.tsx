@@ -55,7 +55,7 @@ export default function RecentProblems({
     <Card
       title="最近题目"
       extra={
-        <Link href="/CodeAgent?tab=problems">
+        <Link href="/CodeAgent/problems">
           全部题目 <ArrowRightOutlined />
         </Link>
       }

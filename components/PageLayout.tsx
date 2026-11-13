@@ -49,7 +49,7 @@ export default function PageLayout({
 
         {/* 右侧：上下布局（顶栏 / 内容区） */}
         <Layout style={{ maxHeight: "calc(100vh)" }}>
-          {/* TopNav 读取 ?tab= 计算弹出面板高亮，需要 Suspense 边界；fallback 用同尺寸 Header 防止布局跳动 */}
+          {/* TopNav 内含使用导航路由的组件，保留 Suspense 边界；fallback 用同尺寸 Header 防止布局跳动 */}
           <Suspense
             fallback={
               <Layout.Header style={{ background: colorBgContainer }} />

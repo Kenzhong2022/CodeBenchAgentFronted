@@ -60,7 +60,7 @@ export default function UserProfileCard() {
           Level {level} {exp}/{XP_MAX}
         </Typography.Paragraph>
         <Space size={24}>
-          <Link href="/CodeAgent?tab=problems">
+          <Link href="/CodeAgent/problems">
             <Button type="primary" ghost icon={<RocketOutlined />}>
               个人中心
             </Button>

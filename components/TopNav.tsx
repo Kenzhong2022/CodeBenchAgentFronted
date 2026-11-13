@@ -25,7 +25,7 @@ import {
   SettingOutlined,
   UserOutlined,
 } from "@ant-design/icons";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { NAV_GROUPS, getActiveGroup } from "./navConfig";
 import { useThemeMode, type ThemeMode } from "./useThemeMode";
 import { clearSessionUser, getSessionUser, type SessionUser } from "@/lib/session";
@@ -70,13 +70,12 @@ export default function TopNav({
 }) {
   const pathname = usePathname();
   const router = useRouter();
-  const searchParams = useSearchParams();
   const activeGroup = getActiveGroup(pathname);
-  // 与 SideNav 同一算法：当前 URL 对应的二级菜单 key，用于弹出面板高亮当前项
-  const tab = searchParams.get("tab");
-  const currentKey = tab
-    ? `${activeGroup.key}?tab=${tab}`
-    : activeGroup.children[0]?.key;
+  // 与 SideNav 同一算法：当前 URL 匹配到的二级菜单 key（子路由前缀匹配），
+  // 用于弹出面板高亮当前项；无命中时高亮分组第一项
+  const currentKey =
+    activeGroup.children.find((child) => pathname.startsWith(child.key))?.key ??
+    activeGroup.children[0]?.key;
   const [searchOpen, setSearchOpen] = useState(false);
   const [keyword, setKeyword] = useState("");
   const { token } = theme.useToken();
