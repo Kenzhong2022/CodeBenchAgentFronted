@@ -57,3 +57,4 @@ wr-stdout.log
 /.trae/
 .mcp.json
 skills-lock.json
+deploy-out.txt
