@@ -2,9 +2,9 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import { App as AntApp, Button, Form, Input } from "antd";
 import { GoogleOutlined } from "@ant-design/icons";
+import AuthBrandPanel from "@/components/AuthBrandPanel";
 import { setSessionUser } from "@/lib/session";
 
 /** 登录表单数据类型 */
@@ -14,7 +14,7 @@ interface LoginForm {
 }
 
 /**
- * 登录页：左右布局 —— 左侧品牌视觉（login_bg.jpg + 标语），右侧登录表单。
+ * 登录页：左右布局 —— 左侧品牌视觉（images/login/ 轮播图 + 标语），右侧登录表单。
  * 表单：邮箱 + 密码两个输入框；提交「登录」；另有两个按钮：
  * 「使用 Google 登录」（未开放）与「创建新账户」（跳转注册）。
  */
@@ -59,34 +59,12 @@ function LoginView() {
   }
 
   return (
-    <div className="flex min-h-screen bg-white">
+    <div className="flex min-h-screen bg-(--ant-layout-body-bg)">
       {/* 左侧品牌面板：移动端隐藏 */}
-      <div className="relative hidden h-screen aspect-3/4 overflow-hidden md:block">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src="/login_bg.jpg"
-          alt=""
-          className="absolute inset-0 h-full w-full object-fill"
-        />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-black/10 to-black/30" />
-        <div className="absolute top-8 left-10 text-2xl font-bold tracking-tight text-white">
-          CodeBench
-        </div>
-        <div className="absolute top-8 right-10">
-          <Link
-            href="/"
-            className="link-reset text-sm text-white/80 hover:text-white"
-          >
-            返回首页
-          </Link>
-        </div>
-        <p className="absolute top-1/2 left-1/2 w-[420px] -translate-x-1/2 -translate-y-1/2 text-center text-3xl leading-relaxed font-medium text-white">
-          查看每天分享的精彩时刻，随时随地练习编程。
-        </p>
-      </div>
+      <AuthBrandPanel slogan="查看每天分享的精彩时刻，随时随地练习编程。" showBackLink />
 
       {/* 右侧登录表单 */}
-      <div className="flex-1 flex w-full items-center justify-center px-8 md:w-2/5">
+      <div className="flex-1 flex w-full items-center justify-center px-8 md:w-2/5 bg-(--ant-layout-body-bg)">
         <div className="w-full max-w-[400px] py-16">
           <h1 className="mb-8 text-2xl font-bold text-gray-900">
             登录 CodeBench

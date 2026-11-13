@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { App as AntApp, Button, Form, Input, type FormInstance } from "antd";
+import AuthBrandPanel from "@/components/AuthBrandPanel";
 
 /** 注册表单数据类型 */
 interface RegisterForm {
@@ -95,26 +96,12 @@ function RegisterView() {
   }
 
   return (
-    <div className="flex min-h-screen bg-white">
+    <div className="flex min-h-screen bg-(--ant-layout-body-bg)">
       {/* 左侧品牌面板：移动端隐藏 */}
-      <div className="relative hidden h-screen aspect-3/4 overflow-hidden md:block">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src="/login_bg.jpg"
-          alt=""
-          className="absolute inset-0 h-full w-full object-fill"
-        />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-black/10 to-black/30" />
-        <div className="absolute top-8 left-10 text-2xl font-bold tracking-tight text-white">
-          CodeBench
-        </div>
-        <p className="absolute top-1/2 left-1/2 w-[420px] -translate-x-1/2 -translate-y-1/2 text-center text-3xl leading-relaxed font-medium text-white">
-          创建账户，开启你的编程练习之旅。
-        </p>
-      </div>
+      <AuthBrandPanel slogan="创建账户，开启你的编程练习之旅。" />
 
       {/* 右侧注册表单 */}
-      <div className="flex-1 flex w-full items-center justify-center px-8 md:w-2/5">
+      <div className="flex-1 flex w-full items-center justify-center px-8 md:w-2/5 bg-(--ant-layout-body-bg)">
         <div className="w-full max-w-[400px] py-16">
           <h1 className="mb-8 text-2xl font-bold text-gray-900">创建新账户</h1>
 
