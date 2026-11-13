@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { Button, Space, Typography } from "antd";
 import { RocketOutlined } from "@ant-design/icons";
-import ExperienceAvatar from "./ExperienceAvatar";
+import ExperienceAvatar from "../components/ExperienceAvatar";
 
 const XP_INIT = 356;
 const XP_MAX = 1000;
@@ -14,7 +14,7 @@ const XP_STEP_MAX = 3;
  * @description 用户信息头部卡片：经验环头像（rAF 模拟经验增长）+ 用户名、等级经验
  *              与个人中心入口；作为右侧侧栏的第一个头部组件
  */
-export default function UserHeader() {
+export default function UserProfileCard() {
   const [exp, setExp] = useState(XP_INIT);
   const expRef = useRef(exp);
 

@@ -6,19 +6,19 @@ import dayjs from "dayjs";
 import { Button, Space, Typography, theme } from "antd";
 import { PlayCircleOutlined } from "@ant-design/icons";
 import { fetchRows } from "@/lib/tableClient";
-import HeroBanner from "./HeroBanner";
-import DifficultyEntries from "./DifficultyEntries";
-import RecentProblems, { type ProblemListItem } from "./RecentProblems";
-import SubmissionStats, { type SubmissionRow } from "./SubmissionStats";
-import UserHeader from "./UserHeader";
-import CheckInHeatmap from "./CheckInHeatmap";
+import BannerCard from "./BannerCard";
+import DifficultyEntriesCard from "./DifficultyEntriesCard";
+import RecentProblemsCard, { type ProblemListItem } from "./RecentProblemsCard";
+import SubmissionStatsCard, { type SubmissionRow } from "./SubmissionStatsCard";
+import UserProfileCard from "./UserProfileCard";
+import CheckInHeatmapCard from "./CheckInHeatmapCard";
 
 /**
  * @description CodeAgent 首页容器：负责拉取最近题目数据，按左右布局渲染——
- *              左侧主内容（上 HeroBanner 横幅，中部「行动号召 / 最近题目 / 难度入口」三栏），
- *              右侧预留侧栏区域，后续填充实际内容
+ *              左侧主内容（上 BannerCard 横幅，中部「统计卡片 / 最近题目 / 难度入口」），
+ *              右侧用户信息与打卡热力图侧栏
  */
-export default function CodeAgentHome() {
+export default function HomeContainer() {
   const { token } = theme.useToken();
   const [recent, setRecent] = useState<ProblemListItem[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -109,10 +109,10 @@ export default function CodeAgentHome() {
       <div className="flex-1 min-w-0 flex flex-col gap-4 overflow-auto">
         {/* 上：欢迎横幅 */}
         <div className="flex-1">
-          <HeroBanner />
+          <BannerCard />
         </div>
         {/* 统计组件：总提交数量 / 总通过题目数量 / 提交通过率（数据复用 submissions 拉取） */}
-        <SubmissionStats
+        <SubmissionStatsCard
           rows={submissionRows}
           totalProblems={problemTotal ?? undefined}
         />
@@ -120,7 +120,7 @@ export default function CodeAgentHome() {
         <div className="flex gap-4 flex-1">
           {/* 中右：最近题目（flex-1 占满剩余宽度，min-w-0 防止内容撑破容器） */}
           <div className="flex-1 min-w-0">
-            <RecentProblems
+            <RecentProblemsCard
               recent={recent}
               error={error}
               onRetry={() => setReloadTick((t) => t + 1)}
@@ -128,15 +128,15 @@ export default function CodeAgentHome() {
           </div>
           {/* 中右：最近题目（flex-1 占满剩余宽度，min-w-0 防止内容撑破容器） */}
           <div className="flex-1 min-w-0">
-            <DifficultyEntries />
+            <DifficultyEntriesCard />
           </div>
         </div>
       </div>
       {/* 右：侧栏，用户头部卡片在最上方，其后为打卡热力图与难度入口 */}
       <div className="w-[320px] shrink-0 flex flex-col gap-4 overflow-auto">
-        <UserHeader />
+        <UserProfileCard />
         {/* 打卡热力图：数据来自 submissions 表；未加载完成时组件内部用模拟数据占位 */}
-        <CheckInHeatmap values={checkInValues ?? undefined} />
+        <CheckInHeatmapCard values={checkInValues ?? undefined} />
       </div>
     </div>
   );

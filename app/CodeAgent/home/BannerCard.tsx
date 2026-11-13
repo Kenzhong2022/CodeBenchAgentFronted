@@ -9,7 +9,7 @@ const XP_INIT = 356;
 const XP_MAX = 1000;
 const XP_STEP_MAX = 3;
 
-export default function HeroBanner() {
+export default function BannerCard() {
   const { token } = theme.useToken();
 
   const [exp, setExp] = useState(XP_INIT);
@@ -39,7 +39,7 @@ export default function HeroBanner() {
       {/* 1. 视频 */}
       <video
         className="absolute inset-0 h-full w-full object-fill"
-        src="/video/CodeAgent/home/banner_coder.mp4"
+        src="/videos/CodeAgent/home/banner_coder.mp4"
         autoPlay
         muted
         loop

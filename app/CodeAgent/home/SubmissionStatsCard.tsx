@@ -1,7 +1,7 @@
 "use client";
 
 import { Card, Statistic } from "antd";
-import ProgressRing from "./ProgressRing";
+import ProgressRing from "../components/ProgressRing";
 
 /**
  * @description 提交记录行类型：子组件自行声明所需字段并导出，
@@ -46,11 +46,11 @@ export function computeSubmissionStats(rows: SubmissionRow[]): SubmissionStats {
 
 /**
  * @description 提交统计卡片组：三张 borderless Card + Statistic（左侧）与通过率进度环（右侧），
- *              数据由父组件传入（CodeAgentHome 已统一拉取 submissions，避免重复请求）；
+ *              数据由父组件传入（HomeContainer 已统一拉取 submissions，避免重复请求）；
  *              rows 为 null / undefined 时按空数组处理，统计值显示 0。
  *              环形中央文字颜色可由外部通过 textColor / textMutedColor 控制（默认亮白 / 灰）
  */
-export default function SubmissionStats({
+export default function SubmissionStatsCard({
   rows = null,
   totalProblems,
   textColor = "var(--ant-color-text-label)",

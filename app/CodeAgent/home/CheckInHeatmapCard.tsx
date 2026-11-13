@@ -119,17 +119,9 @@ export default function CheckInHeatmap({
           {monthRangeText}
         </span>
       </div>
-      <div className="rounded-lg border border-(--ant-color-border-secondary) bg-(--ant-color-bg-layout) px-[10px] py-2">
-        <CheckInMonthHeatmap
-          theme={resolvedTheme}
-          today={today}
-          getValue={resolveValue}
-          monthInfo={monthInfo}
-        />
-      </div>
 
       {showStats && (
-        <div className="mt-[14px] flex flex-wrap gap-[12px] border-t border-(--ant-color-split) pt-3">
+        <div className="mb-[14px] flex flex-wrap gap-[12px] border-b border-(--ant-color-split) pb-3">
           <div className="flex items-baseline gap-1.5">
             <span className="font-mono text-lg font-bold text-(--ant-color-primary)">
               {stats.total}
@@ -156,6 +148,14 @@ export default function CheckInHeatmap({
           </div>
         </div>
       )}
+      <div className="rounded-lg border border-(--ant-color-border-secondary) bg-(--ant-color-bg-layout) px-[10px] py-2">
+        <CheckInMonthHeatmap
+          theme={resolvedTheme}
+          today={today}
+          getValue={resolveValue}
+          monthInfo={monthInfo}
+        />
+      </div>
     </div>
   );
 }
