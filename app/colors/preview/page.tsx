@@ -191,14 +191,7 @@ export default function ColorsPage() {
   const colorTokenMap = token as unknown as Record<string, string>;
 
   return (
-    <PageLayout
-      header={
-        <PageHeader
-          title="色系"
-          description="antd 主题全部颜色 token 预览，颜色随当前主题算法（亮色 / 暗色 / 紧凑）自动变化"
-        />
-      }
-    >
+    <PageLayout>
       <div className="flex flex-col gap-4">
         {COLOR_GROUPS.map((group) => (
           <Card key={group.title} title={group.title} size="small">

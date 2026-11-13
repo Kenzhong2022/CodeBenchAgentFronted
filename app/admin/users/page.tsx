@@ -50,23 +50,18 @@ export default function AdminUsersPage() {
   const [loading, setLoading] = useState(false);
 
   /** @description 统一错误提取：转发层错误结构为 { error: string } */
-  const request = useCallback(
-    async (init: RequestInit & { url: string }) => {
-      const { url, ...options } = init;
-      const res = await fetch(url, {
-        headers: { "Content-Type": "application/json" },
-        ...options,
-      });
-      const body = await res.json().catch(() => null);
-      if (!res.ok) {
-        throw new Error(
-          (body as { error?: string } | null)?.error ?? "请求失败"
-        );
-      }
-      return body;
-    },
-    []
-  );
+  const request = useCallback(async (init: RequestInit & { url: string }) => {
+    const { url, ...options } = init;
+    const res = await fetch(url, {
+      headers: { "Content-Type": "application/json" },
+      ...options,
+    });
+    const body = await res.json().catch(() => null);
+    if (!res.ok) {
+      throw new Error((body as { error?: string } | null)?.error ?? "请求失败");
+    }
+    return body;
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -94,21 +89,16 @@ export default function AdminUsersPage() {
   }, [load]);
 
   return (
-    <PageLayout
-      header={
-        <PageHeader
-          title="用户管理"
-          description="查询、创建、编辑与删除用户账号；操作即时写入 accounts 表。"
-        />
-      }
-    >
+    <PageLayout>
       <AdminCrudTable<AdminUser>
         columns={[
           {
             title: "用户名",
             dataIndex: "name",
             width: 160,
-            render: (value: string) => <Typography.Text strong>{value}</Typography.Text>,
+            render: (value: string) => (
+              <Typography.Text strong>{value}</Typography.Text>
+            ),
           },
           { title: "邮箱", dataIndex: "email", width: 240 },
           {
@@ -142,7 +132,11 @@ export default function AdminUsersPage() {
         createLabel="新增用户"
         formFields={FORM_FIELDS}
         onCreate={async (values) => {
-          await request({ url: "/api/users", method: "POST", body: JSON.stringify(values) });
+          await request({
+            url: "/api/users",
+            method: "POST",
+            body: JSON.stringify(values),
+          });
           await load();
         }}
         onUpdate={async (record, values) => {

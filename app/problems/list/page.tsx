@@ -8,12 +8,7 @@ import ProblemList from "@/components/ProblemList";
 export default function ProblemsPage() {
   return (
     <PageLayout
-      header={
-        <PageHeader
-          title="题目列表"
-          description="游标分页浏览题库：按数据集筛选，逐页加载，点击条目查看题目详情。"
-        />
-      }
+      header={<PageHeader />}
       contentClassName="bg-(--ant-color-bg-container)"
     >
       <ProblemList />

@@ -34,7 +34,11 @@ type CssVarInfo = {
 };
 
 // 从页面所有样式表中收集 --ant-* 变量声明（取每个变量首次出现的声明）
-function collectAntCssVars(): { name: string; scope: string; rawValue: string }[] {
+function collectAntCssVars(): {
+  name: string;
+  scope: string;
+  rawValue: string;
+}[] {
   const found = new Map<string, { selector: string; value: string }>();
   const visit = (rules: CSSRuleList) => {
     for (const rule of Array.from(rules)) {
@@ -146,39 +150,42 @@ export default function CssVarsPage() {
     }
     return entries
       .filter(([, list]) => list.length > 0)
-      .sort((a, b) => (a[0] === "全局 token" ? -1 : b[0] === "全局 token" ? 1 : 0))
+      .sort((a, b) =>
+        a[0] === "全局 token" ? -1 : b[0] === "全局 token" ? 1 : 0,
+      )
       .sort((a, b) => b[1].length - a[1].length)
       .map(([key, list]) => ({ key, list }));
   }, [vars, keyword]);
 
   return (
-    <PageLayout
-      header={
-        <PageHeader
-          title="CSS 变量"
-          description="antd 注入的 --ant-* CSS 变量实时浏览器，可在自定义样式与内联样式中直接引用"
-        />
-      }
-    >
+    <PageLayout>
       {/* 说明区 */}
       <Card size="small" title="说明" className="mb-4">
         <Typography>
           <Typography.Paragraph>
-            antd v6 默认开启 CSS 变量模式（cssVar），把主题 token 注入为 CSS 变量：
-            全局 token <Typography.Text code>colorPrimary</Typography.Text> →{" "}
+            antd v6 默认开启 CSS 变量模式（cssVar），把主题 token 注入为 CSS
+            变量： 全局 token{" "}
+            <Typography.Text code>colorPrimary</Typography.Text> →{" "}
             <Typography.Text code>--ant-color-primary</Typography.Text>；组件
-            token{" "}
-            <Typography.Text code>Layout.Sider siderBg</Typography.Text> →{" "}
+            token <Typography.Text code>Layout.Sider siderBg</Typography.Text> →{" "}
             <Typography.Text code>--ant-layout-sider-bg</Typography.Text>。
           </Typography.Paragraph>
           <Typography.Paragraph>
-            用法：<Typography.Text code>style={"{{ background: 'var(--ant-color-primary)' }}"}</Typography.Text>
-            ，或在自定义 CSS 中书写 <Typography.Text code>background: var(--ant-color-primary)</Typography.Text>
+            用法：
+            <Typography.Text code>
+              style={"{{ background: 'var(--ant-color-primary)' }}"}
+            </Typography.Text>
+            ，或在自定义 CSS 中书写{" "}
+            <Typography.Text code>
+              background: var(--ant-color-primary)
+            </Typography.Text>
             。变量随主题算法自动变化，切换暗色模式时无需改动样式代码。
           </Typography.Paragraph>
           <Typography.Paragraph type="warning">
-            注意：组件级变量（如 --ant-layout-sider-bg）只在该组件的类名作用域内定义，
-            在组件外引用会得到空值；全局变量（--ant-color-* 等）在任意位置均可引用。
+            注意：组件级变量（如
+            --ant-layout-sider-bg）只在该组件的类名作用域内定义，
+            在组件外引用会得到空值；全局变量（--ant-color-*
+            等）在任意位置均可引用。
             变量在组件首次渲染后才会注入，本页扫描结果来自应用已渲染过的组件。
           </Typography.Paragraph>
         </Typography>
