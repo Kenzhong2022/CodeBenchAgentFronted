@@ -26,7 +26,7 @@ export default function PageHeader({
 }) {
   const router = useRouter();
   return (
-    <div className="hover:bg-(--ant-button-link-hover-bg) bg-[#000] rounded-md">
+    <div className="hover:bg-(--ant-button-link-hover-bg) rounded-md">
       {backHref ? (
         <Space size={8}>
           <Button

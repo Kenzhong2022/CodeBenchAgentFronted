@@ -2,7 +2,18 @@
 
 import { useEffect, useState } from "react";
 import dayjs from "dayjs";
-import { Alert, Button, Empty, Listy, Segmented, Select, Space, Spin, Tag, Typography } from "antd";
+import {
+  Alert,
+  Button,
+  Empty,
+  Listy,
+  Segmented,
+  Select,
+  Space,
+  Spin,
+  Tag,
+  Typography,
+} from "antd";
 import { ReloadOutlined } from "@ant-design/icons";
 
 /**
@@ -53,7 +64,7 @@ const LANGUAGE_OPTIONS = [
  */
 async function fetchPage(
   nextCursor: string | number | null,
-  datasetName?: string
+  datasetName?: string,
 ): Promise<ProblemPage> {
   const params = new URLSearchParams({ limit: String(PAGE_SIZE) });
   if (nextCursor !== null) params.set("cursor", String(nextCursor));
@@ -61,7 +72,9 @@ async function fetchPage(
   const res = await fetch(`/api/problems/cursor?${params.toString()}`);
   const body = await res.json().catch(() => null);
   if (!res.ok) {
-    throw new Error((body as { error?: string } | null)?.error ?? "加载题目失败");
+    throw new Error(
+      (body as { error?: string } | null)?.error ?? "加载题目失败",
+    );
   }
   return body as ProblemPage;
 }
@@ -154,7 +167,11 @@ export default function ProblemList({
         message="加载失败"
         description={error}
         action={
-          <Button size="small" icon={<ReloadOutlined />} onClick={() => setReloadTick((t) => t + 1)}>
+          <Button
+            size="small"
+            icon={<ReloadOutlined />}
+            onClick={() => setReloadTick((t) => t + 1)}
+          >
             重试
           </Button>
         }
@@ -182,7 +199,9 @@ export default function ProblemList({
           value={dataset}
           onChange={(value) => setDataset(value)}
         />
-        <Typography.Text type="secondary">已加载 {items.length} 题</Typography.Text>
+        <Typography.Text type="secondary">
+          已加载 {items.length} 题
+        </Typography.Text>
       </Space>
 
       {items.length === 0 ? (
@@ -198,15 +217,24 @@ export default function ProblemList({
               <div className="flex min-w-0 flex-col gap-1">
                 <Space wrap size={8}>
                   <span>#{item.id}</span>
-                  <span className="truncate">{item.title || `题目 #${item.id}`}</span>
+                  <span className="truncate">
+                    {item.title || `题目 #${item.id}`}
+                  </span>
                   {item.difficulty && DIFFICULTY_COLORS[item.difficulty] ? (
-                    <Tag color={DIFFICULTY_COLORS[item.difficulty]} style={{ marginInlineEnd: 0 }}>
+                    <Tag
+                      color={DIFFICULTY_COLORS[item.difficulty]}
+                      style={{ marginInlineEnd: 0 }}
+                    >
                       {item.difficulty}
                     </Tag>
                   ) : null}
-                  {[item.dataset_name, item.subset].filter(Boolean).join(" / ") && (
+                  {[item.dataset_name, item.subset]
+                    .filter(Boolean)
+                    .join(" / ") && (
                     <Tag style={{ marginInlineEnd: 0 }}>
-                      {[item.dataset_name, item.subset].filter(Boolean).join(" / ")}
+                      {[item.dataset_name, item.subset]
+                        .filter(Boolean)
+                        .join(" / ")}
                     </Tag>
                   )}
                 </Space>
@@ -217,10 +245,12 @@ export default function ProblemList({
                 )}
               </div>
               <a
-                href={itemHref ? itemHref(item) : `/problems/preview?id=${item.id}`}
+                href={
+                  itemHref ? itemHref(item) : `/problems/preview?id=${item.id}`
+                }
                 target="_blank"
                 rel="noreferrer"
-                className="shrink-0"
+                className="shrink-0 ml-auto"
               >
                 {actionLabel}
               </a>
