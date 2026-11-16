@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Button, Input, Select } from "antd";
-import { SendOutlined } from "@ant-design/icons";
+import { ArrowUpOutlined } from "@ant-design/icons";
 
 /** 输入框附带的模型配置：功能开关 + 当前选中的模型 */
 export type ChatModelConfig = {
@@ -95,6 +95,7 @@ export default function ChatInput({
       <div className="flex items-end p-2 gap-2">
         {FEATURE_TOGGLES.map((feature) => (
           <Button
+            shape="round"
             key={feature.key}
             color={config[feature.key] ? "primary" : "default"}
             variant="outlined"
@@ -113,14 +114,13 @@ export default function ChatInput({
           options={MODEL_OPTIONS}
         />
         <Button
+          shape="round"
           type="primary"
-          icon={<SendOutlined />}
+          icon={<ArrowUpOutlined />}
           loading={loading}
           disabled={!text.trim()}
           onClick={handleSend}
-        >
-          发送
-        </Button>
+        ></Button>
       </div>
     </div>
   );

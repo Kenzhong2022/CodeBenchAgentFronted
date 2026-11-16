@@ -71,7 +71,7 @@ export default function ChatContent({
         ref={scrollRef}
         className="flex h-full flex-col gap-4 overflow-y-auto p-4"
       >
-        <div className="m-auto" style={{ width: contentWidth }}>
+        <div className="mx-auto" style={{ width: contentWidth }}>
           {messages.map((message) => (
             <ChatBubbleCard
               key={message.id}

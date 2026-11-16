@@ -12,6 +12,7 @@ import type {
   ChatBubbleAction,
   ChatMessageData,
 } from "./components/ChatBubbleCard";
+import type { ChatRequest } from "./chatApi";
 
 // 首次进入的演示消息：同时展示用户与助手两种气泡形态
 const INITIAL_MESSAGES: ChatMessageData[] = [
@@ -46,6 +47,8 @@ export default function AssistantContainer() {
     useState<ChatModelConfig>(DEFAULT_MODEL_CONFIG);
   // 本地消息自增序号，避免用时间戳做 key
   const nextIdRef = useRef(0);
+  // 会话 ID：首次发送时生成（事件回调仅在客户端执行，避免 SSR 水合不一致），整个会话复用
+  const sessionIdRef = useRef<string | null>(null);
 
   /** @description 复制消息正文到剪贴板 */
   async function copyMessage(text: string) {
@@ -69,13 +72,27 @@ export default function AssistantContainer() {
     ];
   }
 
-  /** @description 发送消息：先追加到列表（助手回复能力接入后在此发起请求） */
+  /** @description 发送消息：追加用户气泡并按契约组装 ChatRequest（服务端暂未实现，先在控制台输出验证） */
   function handleSend(text: string) {
     nextIdRef.current += 1;
-    setMessages((prev) => [
-      ...prev,
-      { id: `local-${nextIdRef.current}`, role: "user", content: text },
-    ]);
+    const messageId = `local-${nextIdRef.current}`;
+    setMessages((prev) => [...prev, { id: messageId, role: "user", content: text }]);
+
+    // 组装请求体：会话 ID 首次生成；父消息取当前列表最后一条（会话首条为 null）；
+    // ref_file_ids / preempt 对应的功能未实现，暂不携带
+    if (!sessionIdRef.current) {
+      sessionIdRef.current = crypto.randomUUID();
+    }
+    const request: ChatRequest = {
+      chat_session_id: sessionIdRef.current,
+      parent_message_id: messages.length > 0 ? messages[messages.length - 1].id : null,
+      prompt: text,
+      model_type: modelConfig.model,
+      search_enabled: modelConfig.webSearch,
+      thinking_enabled: modelConfig.deepThink,
+    };
+    // TODO: 服务端就绪后改为 fetch / SSE 流式请求
+    console.log("[assistant] ChatRequest", request);
   }
 
   return (
