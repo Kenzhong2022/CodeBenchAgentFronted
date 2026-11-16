@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Button,
   Card,
@@ -94,27 +94,36 @@ export default function AdminCrudTable<T extends { id: string }>({
 
   const openCreate = () => {
     setEditing(null);
-    form.resetFields();
     setModalOpen(true);
   };
   const openEdit = (record: T) => {
     setEditing(record);
-    // 密码类字段不回填，留空表示不修改
-    const fields: Record<string, unknown> = {};
-    for (const field of formFields) {
-      if (field.type !== "password") {
-        fields[field.name] = (record as Record<string, unknown>)[field.name];
-      }
-    }
-    form.setFieldsValue(fields);
     setModalOpen(true);
   };
 
   const close = () => {
     setModalOpen(false);
     setEditing(null);
-    form.resetFields();
   };
+
+  // 表单值回填：等 Modal 内容挂载（Form 与 useForm 实例连接）后再写入，
+  // 避免 setFieldsValue 在挂载前调用触发 useForm 未连接告警；
+  // 新增模式则清空表单
+  useEffect(() => {
+    if (!modalOpen) return;
+    if (editing) {
+      // 密码类字段不回填，留空表示不修改
+      const fields: Record<string, unknown> = {};
+      for (const field of formFields) {
+        if (field.type !== "password") {
+          fields[field.name] = (editing as Record<string, unknown>)[field.name];
+        }
+      }
+      form.setFieldsValue(fields);
+    } else {
+      form.resetFields();
+    }
+  }, [modalOpen, editing, formFields, form]);
 
   /** 提交：编辑时空的 editOptional 字段剔除后交给父组件；失败保持弹窗打开 */
   const handleSubmit = async (raw: Record<string, unknown>) => {
@@ -177,7 +186,12 @@ export default function AdminCrudTable<T extends { id: string }>({
             okButtonProps={{ danger: true, loading: deletingId === record.id }}
             onConfirm={() => handleDelete(record)}
           >
-            <Button type="link" size="small" danger style={{ paddingInline: 4 }}>
+            <Button
+              type="link"
+              size="small"
+              danger
+              style={{ paddingInline: 4 }}
+            >
               删除
             </Button>
           </Popconfirm>
@@ -199,11 +213,7 @@ export default function AdminCrudTable<T extends { id: string }>({
           />
         )}
         {toolbarExtra}
-        <Button
-          type="primary"
-          icon={<PlusOutlined />}
-          onClick={openCreate}
-        >
+        <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
           {createLabel}
         </Button>
       </Space>
@@ -225,66 +235,70 @@ export default function AdminCrudTable<T extends { id: string }>({
         }}
       />
 
-      {/* 新增 / 编辑弹窗：字段由 formFields 配置生成；
-          forceRender 保证关闭时 Form 也挂载，useForm 实例始终连接 */}
+      {/* 新增 / 编辑弹窗：字段由 formFields 配置生成。
+          不能用 forceRender：它会让 Dialog 在 SSR 阶段输出隐藏的
+          .ant-modal-root DOM，与客户端 portal 渲染不一致导致水合失败；
+          关闭状态（open=false）下 Modal 本身不渲染任何 DOM，同样安全。
+          表单回填延迟到弹窗打开后的 effect 中执行（见上方 useEffect） */}
       <Modal
         title={editing ? "编辑" : createLabel}
         open={modalOpen}
         onCancel={close}
         footer={null}
-        forceRender
         width={480}
       >
-        <Form form={form} layout="vertical" onFinish={handleSubmit}>
-          {formFields.map((field) => {
-            // 编辑模式下 editOptional 字段取消必填（留空表示不修改该字段）
-            const requiredActive = Boolean(
-              field.required && !(editing && field.editOptional)
-            );
-            return (
-              <Form.Item
-                key={field.name}
-                name={field.name}
-                label={field.label}
-                rules={
-                  requiredActive
-                    ? [
-                        {
-                          required: true,
-                          message:
-                            field.requiredMessage ?? `请输入${field.label}`,
-                        },
-                        ...(field.rules ?? []),
-                      ]
-                    : (field.rules ?? [])
-                }
-              >
-              {field.type === "password" ? (
-                <Input.Password
-                  placeholder={
-                    field.placeholder ??
-                    (editing && field.editOptional ? "留空表示不修改" : undefined)
+          <Form form={form} layout="vertical" onFinish={handleSubmit}>
+            {formFields.map((field) => {
+              // 编辑模式下 editOptional 字段取消必填（留空表示不修改该字段）
+              const requiredActive = Boolean(
+                field.required && !(editing && field.editOptional),
+              );
+              return (
+                <Form.Item
+                  key={field.name}
+                  name={field.name}
+                  label={field.label}
+                  rules={
+                    requiredActive
+                      ? [
+                          {
+                            required: true,
+                            message:
+                              field.requiredMessage ?? `请输入${field.label}`,
+                          },
+                          ...(field.rules ?? []),
+                        ]
+                      : (field.rules ?? [])
                   }
-                  autoComplete="new-password"
-                />
-              ) : field.type === "textarea" ? (
-                <Input.TextArea
-                  placeholder={field.placeholder}
-                  autoSize={{ minRows: 2, maxRows: 6 }}
-                />
-              ) : (
-                <Input placeholder={field.placeholder} />
-              )}
-            </Form.Item>
-            );
-          })}
-          <Space className="w-full justify-end">
-            <Button onClick={close}>取消</Button>
-            <Button type="primary" htmlType="submit" loading={saving}>
-              保存
-            </Button>
-          </Space>
-        </Form>
+                >
+                  {field.type === "password" ? (
+                    <Input.Password
+                      placeholder={
+                        field.placeholder ??
+                        (editing && field.editOptional
+                          ? "留空表示不修改"
+                          : undefined)
+                      }
+                      autoComplete="new-password"
+                    />
+                  ) : field.type === "textarea" ? (
+                    <Input.TextArea
+                      placeholder={field.placeholder}
+                      autoSize={{ minRows: 2, maxRows: 6 }}
+                    />
+                  ) : (
+                    <Input placeholder={field.placeholder} />
+                  )}
+                </Form.Item>
+              );
+            })}
+            <Space className="w-full justify-end">
+              <Button onClick={close}>取消</Button>
+              <Button type="primary" htmlType="submit" loading={saving}>
+                保存
+              </Button>
+            </Space>
+          </Form>
       </Modal>
     </Card>
   );
