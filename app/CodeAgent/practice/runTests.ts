@@ -56,8 +56,11 @@ export async function runInPyodide(
   onStdout: (line: string) => void,
   onStderr: (line: string) => void,
 ): Promise<PyodideTestReport> {
+  /** 初始化 Pyodide 环境，设置 stdout / stderr 回调，加载用户代码 */
   const pyodide = await getPyodide();
+  /** 设置 Pyodide 环境的 stdout 回调 */
   pyodide.setStdout({ batched: onStdout });
+  /** 设置 Pyodide 环境的 stderr 回调 */
   pyodide.setStderr({ batched: onStderr });
 
   // 把用户代码与用例注入全局变量，交给 Python 侧脚本逐条执行
