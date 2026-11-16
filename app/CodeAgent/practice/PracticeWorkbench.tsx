@@ -1,18 +1,19 @@
 "use client";
 
-import { useRef, useState } from "react";
-import { App, Button, Select, Space, Splitter, Tabs, Tag, Tooltip } from "antd";
+import { useState } from "react";
+import { App, Button, Splitter, Tabs, Tag } from "antd";
 import {
   CheckSquareOutlined,
   CodeOutlined,
-  PlayCircleOutlined,
   ThunderboltOutlined,
 } from "@ant-design/icons";
 import type { PreviewProblem } from "@/components/ProblemStatement";
 import ProblemStatement from "@/components/ProblemStatement";
-import CodeEditor, { type EditorLanguage } from "@/components/CodeEditor";
+import type { EditorLanguage } from "@/components/CodeEditor";
 import { getSessionUser } from "@/lib/session";
-import { DEFAULT_CODE, runInPyodide, type CaseResult } from "./runTests";
+import CodeEditorPanel from "./CodeEditorPanel";
+import { useCodeRunner } from "./useCodeRunner";
+import { DEFAULT_CODE } from "./runTests";
 
 /**
  * @description 练习页工作台：LeetCode 式左右 Splitter（题面 | 工作台），
@@ -28,59 +29,19 @@ export default function PracticeWorkbench({
   const { message } = App.useApp();
   // 作答代码：切换题目时重置为默认模板
   const [code, setCode] = useState(DEFAULT_CODE);
-  // 浏览器端运行状态与输出（Pyodide）；ref 同步保存输出以避免闭包读到旧值
-  const [isRunning, setIsRunning] = useState(false);
-  const [output, setOutput] = useState<string | null>(null);
-  const outputRef = useRef<string | null>(null);
-  // 逐用例结果：与 problem.test_cases 下标对应；null 表示本轮没有可执行结果（如代码本身报错）
-  const [caseResults, setCaseResults] = useState<CaseResult[] | null>(null);
+  // 运行态、控制台输出与逐用例结果：由运行器 hook 统一管理，编辑器与结果面板共用
+  const { running, output, caseResults, run } = useCodeRunner(problem);
   // 右下结果面板：测试用例 / 测试结果 两个 Tab；运行时自动切到「测试结果」
   const [panelTab, setPanelTab] = useState("cases");
   // 作答语言（参考 LeetCode：编辑器上方下拉切换）
   const [language, setLanguage] = useState<EditorLanguage>("python");
 
   /**
-   * @description 覆写输出内容（同步 ref 与 state）
-   */
-  function writeOutput(text: string | null) {
-    outputRef.current = text;
-    setOutput(text);
-  }
-
-  /**
-   * @description 追加一行输出（同步 ref 与 state）
-   */
-  function appendOutput(text: string) {
-    writeOutput((outputRef.current ?? "") + text + "\n");
-  }
-
-  /**
    * @description 运行：执行测试集并在结果面板展示，不落库
    */
-  async function handleRun() {
-    if (isRunning) return;
-    setIsRunning(true);
+  function handleRun() {
     setPanelTab("result");
-    setCaseResults(null);
-    writeOutput("正在加载 Python 环境并执行…");
-    try {
-      const report = await runInPyodide(
-        problem,
-        code,
-        appendOutput,
-        appendOutput,
-      );
-      if (report.compile_error) {
-        writeOutput(`运行报错:\n${report.compile_error}`);
-      } else {
-        setCaseResults(report.results);
-        writeOutput(report.console || "(无输出)");
-      }
-    } catch (error) {
-      writeOutput(`运行报错:\n${(error as Error).message ?? String(error)}`);
-    } finally {
-      setIsRunning(false);
-    }
+    void run(code);
   }
 
   /**
@@ -89,7 +50,7 @@ export default function PracticeWorkbench({
    *              status 由 pass 推导（AC / WA）；需已登录（account_id 取自本地会话）
    */
   async function handleSubmit() {
-    if (isRunning) return;
+    if (running) return;
     if (!code.trim()) {
       message.warning("代码为空，请先编写解答");
       return;
@@ -99,23 +60,11 @@ export default function PracticeWorkbench({
       message.warning("请先登录后再提交评测");
       return;
     }
-    setIsRunning(true);
     setPanelTab("result");
-    setCaseResults(null);
-    writeOutput("正在加载 Python 环境并执行测试集…");
     try {
-      const report = await runInPyodide(
-        problem,
-        code,
-        appendOutput,
-        appendOutput,
-      );
-      if (report.compile_error) {
-        writeOutput(`运行报错:\n${report.compile_error}`);
-      } else {
-        setCaseResults(report.results);
-        writeOutput(report.console || "(无输出)");
-      }
+      const report = await run(code);
+      // 运行本身失败（如环境加载异常）时错误已写入输出，不再落库
+      if (!report) return;
 
       // 聚合总体结果：全部用例通过且无编译错误才算通过；失败原因取编译错误或首个失败用例
       const pass =
@@ -150,10 +99,7 @@ export default function PracticeWorkbench({
         message.warning("未全部通过，提交记录已保存");
       }
     } catch (error) {
-      writeOutput(`运行报错:\n${(error as Error).message ?? String(error)}`);
       message.error((error as Error).message);
-    } finally {
-      setIsRunning(false);
     }
   }
 
@@ -173,46 +119,27 @@ export default function PracticeWorkbench({
           <Splitter orientation="vertical">
             {/* 上：语言栏 + 代码编辑器 */}
             <Splitter.Panel defaultSize="58%" min="30%" max="80%">
-              <div className="flex h-full flex-col gap-2 bg-(--ant-color-bg-container) p-3">
-                <div className="flex items-center justify-between">
-                  <Select
+              <CodeEditorPanel
+                value={code}
+                onChange={setCode}
+                language={language}
+                onLanguageChange={setLanguage}
+                // 测试用例由 Python 侧脚本执行，多语言运行器就绪前先锁定语言
+                languageEditable={false}
+                running={running}
+                onRun={handleRun}
+                extra={
+                  <Button
                     size="small"
-                    style={{ width: 110 }}
-                    value={language}
-                    onChange={setLanguage}
-                    options={[
-                      { value: "python", label: "Python" },
-                      { value: "java", label: "Java" },
-                    ]}
-                  />
-                  <div className="flex items-center gap-2">
-                    <Button
-                      size="small"
-                      icon={<PlayCircleOutlined />}
-                      loading={isRunning}
-                      onClick={handleRun}
-                    >
-                      运行
-                    </Button>
-                    <Button
-                      size="small"
-                      type="primary"
-                      icon={<ThunderboltOutlined />}
-                      onClick={handleSubmit}
-                    >
-                      提交评测
-                    </Button>
-                  </div>
-                </div>
-                <div className="min-h-0 flex-1">
-                  <CodeEditor
-                    value={code}
-                    onChange={setCode}
-                    language={language}
-                    height="100%"
-                  />
-                </div>
-              </div>
+                    type="primary"
+                    icon={<ThunderboltOutlined />}
+                    disabled={running}
+                    onClick={handleSubmit}
+                  >
+                    提交评测
+                  </Button>
+                }
+              />
             </Splitter.Panel>
 
             {/* 下：测试用例 / 测试结果 双 Tab 面板 */}

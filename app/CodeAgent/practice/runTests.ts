@@ -49,6 +49,10 @@ json.dumps({"results": _results, "console": _console.getvalue(), "compile_error"
  * @description 在浏览器端用 Pyodide 跑当前代码：逐个执行测试用例并收集结果。
  *              「运行」与「提交评测」共用；stdout / stderr 回调由调用方传入，
  *              本模块不感知任何 UI 状态（无 React 依赖，便于复用与测试）
+ * @param problem 提供测试用例与依赖导入的题目数据
+ * @param code 待执行的作答代码
+ * @param onStdout 控制台输出回调，用于实时更新 UI
+ * @param onStderr 控制台错误输出回调，用于实时更新 UI
  */
 export async function runInPyodide(
   problem: Pick<PreviewProblem, "test_cases" | "test_imports">,
