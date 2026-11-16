@@ -5,7 +5,7 @@ import Link from "next/link";
 import dayjs from "dayjs";
 import { Button, Space, Typography, theme } from "antd";
 import { PlayCircleOutlined } from "@ant-design/icons";
-import { fetchRows } from "@/lib/tableClient";
+import { getSessionUser, type SessionUser } from "@/lib/session";
 import BannerCard from "./BannerCard";
 import DifficultyEntriesCard from "./DifficultyEntriesCard";
 import RecentProblemsCard, { type ProblemListItem } from "./RecentProblemsCard";
@@ -23,6 +23,11 @@ export default function HomeContainer() {
   const [recent, setRecent] = useState<ProblemListItem[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [reloadTick, setReloadTick] = useState(0);
+  // 登录态在客户端挂载后读取，避免 SSR 水合不一致（与 TopNav 同策略）
+  const [sessionUser, setSessionUser] = useState<SessionUser | null>(null);
+  useEffect(() => {
+    setSessionUser(getSessionUser());
+  }, []);
 
   /** @description 打卡数据源：YYYY-MM-DD → 当天提交次数；null 表示未加载完成（热力图先用内置模拟兜底） */
   const [checkInValues, setCheckInValues] = useState<Record<
@@ -54,14 +59,24 @@ export default function HomeContainer() {
     };
   }, [reloadTick]);
 
-  // 拉取提交记录表：一份原始行同时供统计卡片与打卡热力图（按本地日期聚合提交次数）；
-  // fetchRows 返回无类型的 TableRow，此处按子组件导出的 SubmissionRow 标记真实数据源
+  // 拉取当前登录用户的提交记录（mine=true 由 Python 端按会话 Cookie 过滤）：
+  // 一份原始行同时供统计卡片与打卡热力图（按本地日期聚合提交次数）；
+  // 未登录时不请求，直接置空——统计显示 0、热力图回退内置模拟占位
   useEffect(() => {
     let cancelled = false;
-    fetchRows("submissions")
-      .then((rows) => {
+    if (!sessionUser) {
+      setSubmissionRows([]);
+      setCheckInValues({});
+      return;
+    }
+    fetch("/api/submissions?mine=true", { cache: "no-store" })
+      .then(async (res) => {
+        const body = await res.json().catch(() => null);
+        if (!res.ok) throw new Error(body?.error ?? "加载提交记录失败");
+        return body as SubmissionRow[];
+      })
+      .then((typedRows) => {
         if (cancelled) return;
-        const typedRows = rows as SubmissionRow[];
         setSubmissionRows(typedRows);
         const byDay: Record<string, number> = {};
         for (const row of typedRows) {
@@ -71,12 +86,15 @@ export default function HomeContainer() {
         setCheckInValues(byDay);
       })
       .catch((err: Error) => {
+        if (cancelled) return;
         console.error("[checkin] 提交记录加载失败", err);
+        setSubmissionRows([]);
+        setCheckInValues({});
       });
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [sessionUser]);
 
   // 拉取最新一批题目，传给下部最近题目卡片
   useEffect(() => {

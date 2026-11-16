@@ -248,6 +248,8 @@ export default function TopNav({
               selectedKeys: [mode],
               onClick: ({ key }) => {
                 if (key === "logout") {
+                  // 同时清除服务端会话 Cookie 与本地 UI 登录标记
+                  void fetch("/api/auth/logout", { method: "POST" });
                   clearSessionUser();
                   setUser(null);
                   router.push("/login");

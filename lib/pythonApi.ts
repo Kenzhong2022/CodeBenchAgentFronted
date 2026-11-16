@@ -5,8 +5,9 @@ import { NextResponse } from "next/server";
  */
 // Worker 运行时模块加载阶段拿不到请求级环境变量，必须在请求时读取
 export function apiBase(): string {
-  // return process.env.CODEBENCH_API_URL ?? "http://127.0.0.1:8000";
-  return process.env.CODEBENCH_API_URL ?? "https://codebenchagent.vercel.app";
+  return process.env.CODEBENCH_API_URL ?? "http://127.0.0.1:8000";
+  // 线上 Python 服务（本地联调 Cookie 会话时需切回 127.0.0.1:8000）：
+  // return process.env.CODEBENCH_API_URL ?? "https://codebenchagent.vercel.app";
 }
 
 /**
@@ -34,6 +35,47 @@ export async function callPython(
   }
   const body = await res.json().catch(() => null);
   return { ok: res.ok, status: res.status, body };
+}
+
+/**
+ * @description 与 callPython 相同，但额外返回 Python 响应的 Set-Cookie 头数组：
+ *              登录 / 退出接口签发或清除 HttpOnly 会话 Cookie，需要原样透传给浏览器
+ */
+export async function callPythonRaw(
+  path: string,
+  init?: RequestInit,
+): Promise<{ ok: boolean; status: number; body: unknown; setCookies: string[] }> {
+  let res: Response;
+  try {
+    res = await fetch(`${apiBase()}${path}`, { cache: "no-store", ...init });
+  } catch {
+    return {
+      ok: false,
+      status: 502,
+      body: {
+        detail: `后端服务不可用（${apiBase()}），请确认 FastAPI 服务已启动`,
+      },
+      setCookies: [],
+    };
+  }
+  const body = await res.json().catch(() => null);
+  return {
+    ok: res.ok,
+    status: res.status,
+    body,
+    setCookies: res.headers.getSetCookie?.() ?? [],
+  };
+}
+
+/**
+ * @description 构造把浏览器会话 Cookie 转发给 Python 的请求头：
+ *              Python 端 /api/auth/me、/api/submissions?mine=true 依赖 cb_token Cookie 鉴权
+ * @param req 前端请求
+ * @returns 可展开进 callPython init 的 headers 片段（无 Cookie 时为空对象）
+ */
+export function forwardCookies(req: Request): { headers?: Record<string, string> } {
+  const cookie = req.headers.get("cookie");
+  return cookie ? { headers: { cookie } } : {};
 }
 
 /**
