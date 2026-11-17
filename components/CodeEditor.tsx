@@ -5,8 +5,18 @@ import CodeMirror from "@uiw/react-codemirror";
 import { python } from "@codemirror/lang-python";
 import { oneDark } from "@codemirror/theme-one-dark";
 
-// 编辑器支持的作答语言（Java 语言包安装 @codemirror/lang-java 后在此扩展）
-export type EditorLanguage = "python" | "java";
+// 编辑器支持的作答语言：与后端 /api/execute 的编译器白名单对应
+// （语言 -> 编译器 ID 的映射在 app/CodeAgent/playground 页面维护）
+export type EditorLanguage =
+  | "python"
+  | "java"
+  | "cpp"
+  | "c"
+  | "go"
+  | "javascript"
+  | "typescript"
+  | "rust"
+  | "csharp";
 
 // 语言 -> CodeMirror 语法扩展；未安装对应语言包时回退到纯文本
 function languageExtensionOf(language: EditorLanguage) {

@@ -125,7 +125,7 @@ export default function PracticeWorkbench({
                 language={language}
                 onLanguageChange={setLanguage}
                 // 测试用例由 Python 侧脚本执行，多语言运行器就绪前先锁定语言
-                languageEditable={false}
+                languageEditable={true}
                 running={running}
                 onRun={handleRun}
                 extra={

@@ -9,6 +9,13 @@ import CodeEditor, { type EditorLanguage } from "@/components/CodeEditor";
 const LANGUAGE_LABELS: Record<EditorLanguage, string> = {
   python: "Python",
   java: "Java",
+  cpp: "C++",
+  c: "C",
+  go: "Go",
+  javascript: "JavaScript",
+  typescript: "TypeScript",
+  rust: "Rust",
+  csharp: "C#",
 };
 
 /**
@@ -29,7 +36,7 @@ export default function CodeEditorPanel({
   onChange,
   language,
   onLanguageChange,
-  languages = ["python", "java"],
+  languages = ["python", "java", "cpp", "c", "go", "javascript", "typescript", "rust", "csharp"],
   languageEditable = true,
   running = false,
   onRun,
