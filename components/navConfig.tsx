@@ -7,6 +7,7 @@ import {
   CodeOutlined,
   DeepSeekFilled,
   DashboardOutlined,
+  PlayCircleOutlined,
   SafetyOutlined,
   SettingOutlined,
   TeamOutlined,
@@ -95,6 +96,12 @@ export const NAV_GROUPS: NavGroup[] = [
         description: "获取代码提示与建议",
         icon: <DeepSeekFilled />,
       },
+      {
+        key: "/CodeAgent/playground",
+        label: "自定义运行",
+        description: "多语言代码沙箱运行（Playground）",
+        icon: <PlayCircleOutlined />,
+      },
     ],
   },
   {
@@ -119,6 +126,12 @@ export const NAV_GROUPS: NavGroup[] = [
         label: "角色管理",
         description: "角色与权限管理（规划中）",
         icon: <SafetyOutlined />,
+      },
+      {
+        key: "/admin/submissions",
+        label: "提交管理",
+        description: "所有用户的提交记录查看与维护",
+        icon: <BookOutlined />,
       },
     ],
   },

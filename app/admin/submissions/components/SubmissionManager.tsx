@@ -3,10 +3,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import dayjs from "dayjs";
 import { Tag } from "antd";
-import CrudManager from "@/components/CrudManager";
-import FilterForm from "@/components/FilterForm";
-import type { CrudField } from "@/components/CrudManager";
-import type { FilterField, FilterValues } from "@/components/FilterForm";
+import CrudManager, { deriveFilterFields } from "@/components/CrudManager";
+import type { CrudField, FilterValues } from "@/components/CrudManager";
 import {
   fetchRows,
   matchRow,
@@ -37,13 +35,8 @@ const STATUS_OPTIONS = Object.entries(STATUS_META).map(([value, meta]) => ({
   label: `${value}（${meta.label}）`,
 }));
 
-const FILTER_FIELDS: FilterField[] = [
-  { name: "status", label: "评测状态", type: "select", options: STATUS_OPTIONS },
-  { name: "problemTitle", label: "题目标题" },
-  { name: "createdAt", label: "提交时间", type: "dateRange" },
-];
-
-// 提交管理：submissions 表的增删改查；题目 / 账号字段关联 problems、accounts 表做下拉选择与展示
+// 提交管理：submissions 表的增删改查；题目 / 账号字段关联 problems、accounts 表做下拉选择与展示。
+// 筛选项不再单独配置，由 fields 自动推导（status/题目/账号→下拉精确匹配，提交时间→日期区间）
 export default function SubmissionManager() {
   const [rows, setRows] = useState<Row[]>([]);
   const [problems, setProblems] = useState<ProblemBrief[]>([]);
@@ -119,6 +112,8 @@ export default function SubmissionManager() {
         label: "提交账号",
         type: "select",
         options: accountOptions,
+        // 账号会越来越多，筛选不用下拉全量拉取，改为按账号名的关键字搜索（匹配行上的 accountName 计算字段）
+        filter: { name: "accountName", label: "提交账号", placeholder: "按账号名搜索" },
         render: (value) => {
           const name = accountNameById.get(String(value));
           const idText = String(value);
@@ -145,22 +140,26 @@ export default function SubmissionManager() {
       {
         name: "created_at",
         label: "提交时间",
+        type: "date",
         editable: false,
         render: (value) => dayjs(String(value)).format("YYYY-MM-DD HH:mm"),
       },
     ];
   }, [problems, problemTitleById, accounts, accountNameById]);
 
-  // 点击查询后的可见行；problemTitle 是展示用计算字段，按题目标题过滤
+  // 筛选字段由 fields 自动推导：status/题目下拉精确匹配，提交时间日期区间，账号按名称关键字搜索
+  const filterFields = useMemo(() => deriveFilterFields(fields), [fields]);
+
+  // accountName 是筛选用计算字段：按账号名关键字包含匹配
   const visibleRows = useMemo(
     () =>
       rows
         .map((row) => ({
           ...row,
-          problemTitle: problemTitleById.get(String(row.problem_id)) ?? "",
+          accountName: accountNameById.get(String(row.account_id)) ?? "",
         }))
-        .filter((row) => matchRow(row, filters)),
-    [rows, filters, problemTitleById]
+        .filter((row) => matchRow(row, filters, filterFields)),
+    [rows, filters, filterFields, accountNameById]
   );
 
   // 先更新界面，再把差异写回数据库；无论成败都重新拉取，保证拿到服务端规范后的数据（自增 id）
@@ -185,15 +184,12 @@ export default function SubmissionManager() {
 
   return (
     <div className="flex flex-col gap-4">
-      <FilterForm
-        fields={FILTER_FIELDS}
-        onSearch={(values) => setFilters(values)}
-      />
       <CrudManager
         title="提交"
         fields={fields}
         rows={visibleRows}
         onChange={handleRowsChange}
+        onFilterSearch={(values) => setFilters(values)}
       />
     </div>
   );

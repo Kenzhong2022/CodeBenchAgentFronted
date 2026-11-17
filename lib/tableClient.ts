@@ -1,5 +1,5 @@
 import dayjs, { type Dayjs } from "dayjs";
-import type { FilterValues } from "@/components/FilterForm";
+import type { FilterField, FilterValues } from "@/components/CrudManager";
 
 /**
  * @description 自增主键表的数据行：id 由数据库生成，可能是数字；其余字段值类型不限（如 jsonb 返回数组）
@@ -119,21 +119,34 @@ export async function persistTable(
  */
 
 /**
- * @description 通用匹配：createdAt 日期区间单独处理，其余键对行字段做包含匹配
+ * @description 通用匹配：按筛选字段类型分发匹配方式——dateRange 日期区间（字段名即行内日期字段）、
+ *              select/number 精确等值，其余（含未提供 filterFields 时）文本包含匹配
  * @param row 待判断的数据行
  * @param filters 筛选条件（空条件恒通过）
+ * @param filterFields 筛选字段定义（决定各条件的匹配方式；不传时全部按文本包含匹配）
  * @returns 行是否满足全部筛选条件
  */
-export function matchRow(row: TableRow, filters: FilterValues): boolean {
+export function matchRow(
+  row: TableRow,
+  filters: FilterValues,
+  filterFields?: FilterField[]
+): boolean {
+  const typeByName = new Map(
+    (filterFields ?? []).map((field) => [field.name, field.type])
+  );
   return Object.entries(filters).every(([key, value]) => {
     if (value === undefined || value === null || value === "") return true;
-    if (key === "createdAt" && Array.isArray(value)) {
+    const type = typeByName.get(key);
+    if (type === "dateRange" && Array.isArray(value)) {
       const [start, end] = value as (Dayjs | null)[];
       if (!start && !end) return true;
-      const time = dayjs(String(row.created_at));
+      const time = dayjs(String(row[key]));
       if (start && time.isBefore(start.startOf("day"))) return false;
       if (end && time.isAfter(end.endOf("day"))) return false;
       return true;
+    }
+    if (type === "select" || type === "number") {
+      return String(row[key] ?? "") === String(value);
     }
     return String(row[key] ?? "")
       .toLowerCase()

@@ -1,30 +1,41 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Typography, message } from "antd";
+import { Card, Typography, message } from "antd";
 import dayjs from "dayjs";
 import PageLayout from "@/components/PageLayout";
-import PageHeader from "@/components/PageHeader";
-import AdminCrudTable, {
-  type CrudFormField,
-} from "@/components/AdminCrudTable";
+import CrudManager from "@/components/CrudManager";
+import type { CrudField } from "@/components/CrudManager";
 
-/** 用户行：与 Python 端 /api/users 返回列一致 */
-interface AdminUser {
+/**
+ * 用户行：与 Python 端 /api/users 返回列一致。
+ * 用 type 而非 interface：类型别名可隐式获得索引签名，直接兼容 CrudManager 的行类型
+ */
+type AdminUser = {
   id: string;
   name: string;
   email: string;
   avatar: string | null;
   last_login_at: string | null;
   created_at: string;
-}
+};
 
-// 表单字段配置：创建时必填初始密码，编辑时留空表示不修改
-const FORM_FIELDS: CrudFormField[] = [
-  { name: "name", label: "用户名", required: true, placeholder: "登录展示名" },
+// 表格/表单字段配置：初始密码创建时必填，编辑时留空表示不修改
+const USER_FIELDS: CrudField[] = [
+  {
+    name: "name",
+    label: "用户名",
+    width: 160,
+    required: true,
+    placeholder: "登录展示名",
+    render: (value) => (
+      <Typography.Text strong>{String(value ?? "")}</Typography.Text>
+    ),
+  },
   {
     name: "email",
     label: "邮箱",
+    width: 240,
     required: true,
     requiredMessage: "请输入邮箱",
     rules: [{ type: "email", message: "邮箱格式不正确" }],
@@ -36,11 +47,33 @@ const FORM_FIELDS: CrudFormField[] = [
     required: true,
     type: "password",
     editOptional: true,
+    hideInTable: true,
   },
-  { name: "avatar", label: "头像地址", type: "text", placeholder: "https://…" },
+  {
+    name: "avatar",
+    label: "头像地址",
+    placeholder: "https://…",
+    hideInTable: true,
+  },
+  {
+    name: "last_login_at",
+    label: "最后登录",
+    width: 180,
+    editable: false,
+    render: (value) =>
+      value ? dayjs(String(value)).format("YYYY-MM-DD HH:mm") : "—",
+  },
+  {
+    name: "created_at",
+    label: "创建时间",
+    width: 180,
+    editable: false,
+    render: (value) => dayjs(String(value)).format("YYYY-MM-DD HH:mm"),
+  },
 ];
 
-// 用户管理页：数据与增删改全部走 /api/users（Next 转发 Python /api/users）
+// 用户管理页：数据与增删改全部走 /api/users（Next 转发 Python /api/users）。
+// 表格交互由通用 CrudManager 承担：服务端分页 + 关键字筛选 + 回调模式增删改
 export default function AdminUsersPage() {
   const [rows, setRows] = useState<AdminUser[] | null>(null);
   const [total, setTotal] = useState(0);
@@ -90,68 +123,55 @@ export default function AdminUsersPage() {
 
   return (
     <PageLayout>
-      <AdminCrudTable<AdminUser>
-        columns={[
-          {
-            title: "用户名",
-            dataIndex: "name",
-            width: 160,
-            render: (value: string) => (
-              <Typography.Text strong>{value}</Typography.Text>
-            ),
-          },
-          { title: "邮箱", dataIndex: "email", width: 240 },
-          {
-            title: "最后登录",
-            dataIndex: "last_login_at",
-            width: 180,
-            render: (value: string | null) =>
-              value ? dayjs(value).format("YYYY-MM-DD HH:mm") : "—",
-          },
-          {
-            title: "创建时间",
-            dataIndex: "created_at",
-            width: 180,
-            render: (value: string) => dayjs(value).format("YYYY-MM-DD HH:mm"),
-          },
-        ]}
-        dataSource={rows}
-        loading={loading}
-        total={total}
-        current={page}
-        pageSize={pageSize}
-        onPageChange={(next, nextSize) => {
-          setPage(next);
-          setPageSize(nextSize);
-        }}
-        searchPlaceholder="按用户名 / 邮箱搜索"
-        onSearch={(value) => {
-          setKeyword(value);
-          setPage(1);
-        }}
-        createLabel="新增用户"
-        formFields={FORM_FIELDS}
-        onCreate={async (values) => {
-          await request({
-            url: "/api/users",
-            method: "POST",
-            body: JSON.stringify(values),
-          });
-          await load();
-        }}
-        onUpdate={async (record, values) => {
-          await request({
-            url: `/api/users/${record.id}`,
-            method: "PATCH",
-            body: JSON.stringify(values),
-          });
-          await load();
-        }}
-        onDelete={async (record) => {
-          await request({ url: `/api/users/${record.id}`, method: "DELETE" });
-          await load();
-        }}
-      />
+      <Card>
+        <CrudManager
+          title="用户"
+          fields={USER_FIELDS}
+          rows={rows ?? []}
+          loading={loading}
+          paginated
+          total={total}
+          current={page}
+          pageSize={pageSize}
+          onPageChange={(next, nextSize) => {
+            setPage(next);
+            setPageSize(nextSize);
+          }}
+          filterFields={[
+            {
+              name: "keyword",
+              label: "关键字",
+              placeholder: "按用户名 / 邮箱搜索",
+            },
+          ]}
+          onFilterSearch={(values) => {
+            setKeyword(values.keyword === undefined ? "" : String(values.keyword));
+            setPage(1);
+          }}
+          // 服务端分页只持有当前页数据，导出/导入不适用
+          toolbar={{ export: false }}
+          onCreate={async (values) => {
+            await request({
+              url: "/api/users",
+              method: "POST",
+              body: JSON.stringify(values),
+            });
+            await load();
+          }}
+          onUpdate={async (record, values) => {
+            await request({
+              url: `/api/users/${record.id}`,
+              method: "PATCH",
+              body: JSON.stringify(values),
+            });
+            await load();
+          }}
+          onDelete={async (record) => {
+            await request({ url: `/api/users/${record.id}`, method: "DELETE" });
+            await load();
+          }}
+        />
+      </Card>
     </PageLayout>
   );
 }
