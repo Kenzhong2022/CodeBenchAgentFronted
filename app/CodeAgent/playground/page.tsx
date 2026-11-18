@@ -8,7 +8,7 @@ import type { EditorLanguage } from "@/components/CodeEditor";
 import CodeEditorPanel from "@/app/CodeAgent/practice/CodeEditorPanel";
 
 /**
- * 自定义运行（Playground）：选择语言 → 写任意代码 → 提交服务端沙箱执行。
+ * 快速执行（Playground）：选择语言 → 写任意代码 → 提交服务端沙箱执行。
  * 不关联题目、不跑测试用例，仅作纯运行（stdin 可选），评测请走练习页
  */
 
@@ -52,7 +52,7 @@ export default function PlaygroundPage() {
     <PageLayout
       header={
         <PageHeader
-          title="自定义运行"
+          title="快速执行"
           description="选择语言编写任意代码，提交到服务端沙箱执行（不关联题目、不保存提交记录）"
         />
       }

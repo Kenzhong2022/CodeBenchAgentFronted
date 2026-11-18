@@ -1,12 +1,24 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type UIEventHandler,
+} from "react";
 import dayjs from "dayjs";
 import {
   Alert,
   Button,
   Empty,
+  Flex,
+  Form,
+  Input,
   Listy,
+  message,
+  Modal,
+  Popconfirm,
   Segmented,
   Select,
   Space,
@@ -14,7 +26,7 @@ import {
   Tag,
   Typography,
 } from "antd";
-import { ReloadOutlined } from "@ant-design/icons";
+import { PlusOutlined, ReloadOutlined } from "@ant-design/icons";
 
 /**
  * @description 游标分页接口返回的题目列表项：轻量字段，不含题面与题解长文本
@@ -80,7 +92,22 @@ async function fetchPage(
 }
 
 /**
- * @description 组件属性：itemHref 自定义条目跳转地址（默认预览页），actionLabel 自定义操作文案
+ * @description 新增/编辑弹窗的表单值：test_cases 以 JSON 文本编辑，提交时解析为数组；
+ *              test_imports 以逗号分隔文本编辑
+ */
+type ProblemFormValues = {
+  dataset_name: string;
+  subset?: string;
+  title?: string;
+  difficulty?: string;
+  prompt: string;
+  reference_solution?: string;
+  test_imports?: string;
+  test_cases: string;
+};
+
+/**
+ * @description 组件属性：条目操作统一为「前往练习」（itemHref 可覆盖跳转地址，actionLabel 可覆盖文案）
  */
 type ProblemListProps = {
   itemHref?: (item: ProblemListItem) => string;
@@ -90,11 +117,11 @@ type ProblemListProps = {
 };
 
 /**
- * @description 题目列表页内容：游标分页逐页加载，支持按数据集筛选，点击条目跳转预览页
+ * @description 题目列表页内容：游标分页逐页加载，支持按数据集筛选与题目的增删改查，点击条目前往练习页
  */
 export default function ProblemList({
   itemHref,
-  actionLabel = "预览",
+  actionLabel = "前往练习",
   onLanguageChange,
 }: ProblemListProps) {
   const [items, setItems] = useState<ProblemListItem[]>([]);
@@ -108,6 +135,26 @@ export default function ProblemList({
   const [reloadTick, setReloadTick] = useState(0);
   // 练习语言选择：Python / Java
   const [language, setLanguage] = useState("python");
+  // Listy 虚拟滚动需要数值高度：包裹层在 loading/error 时不渲染（提前 return），
+  // 所以用 callback ref 捕获挂载时机，挂载后由 ResizeObserver 推送尺寸（observe 时自带初始通知）
+  const [listWrap, setListWrap] = useState<HTMLDivElement | null>(null);
+  const [listHeight, setListHeight] = useState(480);
+  // 加载中的 ref 标记：滚动事件可能高频触发，防止并发重复拉取
+  const loadingMoreRef = useRef(false);
+  // 新增/编辑弹窗：editing 为 null 表示新增；test_cases 以 JSON 文本编辑
+  const [form] = Form.useForm<ProblemFormValues>();
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editing, setEditing] = useState<ProblemListItem | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!listWrap) return;
+    const observer = new ResizeObserver((entries) => {
+      setListHeight(entries[0].contentRect.height);
+    });
+    observer.observe(listWrap);
+    return () => observer.disconnect();
+  }, [listWrap]);
 
   // 首次加载与切换数据集时重置列表，重新从第一页拉取
   useEffect(() => {
@@ -133,10 +180,11 @@ export default function ProblemList({
   }, [dataset, reloadTick]);
 
   /**
-   * @description 加载下一页并追加到列表尾部
+   * @description 加载下一页并追加到列表尾部（哨兵自动触发或手动点击）
    */
-  async function loadMore() {
-    if (cursor === null || loadingMore) return;
+  const loadMore = useCallback(async () => {
+    if (cursor === null || loadingMoreRef.current) return;
+    loadingMoreRef.current = true;
     setLoadingMore(true);
     setError(null);
     try {
@@ -147,7 +195,162 @@ export default function ProblemList({
     } catch (err) {
       setError((err as Error).message);
     } finally {
+      loadingMoreRef.current = false;
       setLoadingMore(false);
+    }
+  }, [cursor, dataset]);
+
+  // Listy 虚拟滚动容器的触底加载：距底部 120px 内且未在加载时拉取下一页。
+  // onScroll 只在真实滚动时触发，追加数据后不继续滚动就不会重复请求
+  const handleListScroll: UIEventHandler<HTMLElement> = (event) => {
+    const { scrollTop, clientHeight, scrollHeight } = event.currentTarget;
+    if (
+      !hasMore ||
+      loadingMoreRef.current ||
+      scrollHeight - scrollTop - clientHeight > 120
+    ) {
+      return;
+    }
+    loadMore();
+  };
+
+  /** @description 打开新增弹窗（destroyOnHidden 保证每次都是空白表单） */
+  function openCreate() {
+    setEditing(null);
+    setModalOpen(true);
+  }
+
+  /**
+   * @description 打开编辑弹窗：列表项只有轻量字段，先按 id 拉取题目全量数据回填表单
+   */
+  async function openEdit(item: ProblemListItem) {
+    setEditing(item);
+    setModalOpen(true);
+    try {
+      const res = await fetch(`/api/problems?id=${item.id}`);
+      const body = (await res.json().catch(() => null)) as
+        | (Record<string, unknown> & { test_imports?: string[] | null })
+        | null;
+      if (!res.ok) {
+        throw new Error(
+          (body as { error?: string } | null)?.error ?? "加载题目失败"
+        );
+      }
+      form.setFieldsValue({
+        dataset_name: String(body?.dataset_name ?? ""),
+        subset: (body?.subset as string) || undefined,
+        title: (body?.title as string) || undefined,
+        difficulty: (body?.difficulty as string) || undefined,
+        prompt: (body?.prompt as string) ?? "",
+        reference_solution: (body?.reference_solution as string) || undefined,
+        test_imports: Array.isArray(body?.test_imports)
+          ? body?.test_imports.join(", ")
+          : undefined,
+        test_cases: JSON.stringify(body?.test_cases ?? [], null, 2),
+      });
+    } catch (err) {
+      message.error((err as Error).message);
+      setModalOpen(false);
+    }
+  }
+
+  /**
+   * @description 弹窗提交：test_cases 文本解析为 JSON 数组（非法时定位到该字段）；
+   *              空可选字段不提交，编辑走 PUT 局部更新，新增走 POST 后回到第一页重新加载
+   */
+  async function submit() {
+    let values: ProblemFormValues;
+    try {
+      values = await form.validateFields();
+    } catch {
+      return;
+    }
+    let testCases: unknown[];
+    try {
+      const parsed = JSON.parse(values.test_cases) as unknown;
+      if (!Array.isArray(parsed)) throw new Error("not array");
+      testCases = parsed;
+    } catch {
+      form.setFields([
+        { name: "test_cases", errors: ["必须是合法的 JSON 数组"] },
+      ]);
+      return;
+    }
+    const payload: Record<string, unknown> = {
+      dataset_name: values.dataset_name,
+      prompt: values.prompt,
+      test_cases: testCases,
+    };
+    if (values.title) payload.title = values.title;
+    if (values.subset) payload.subset = values.subset;
+    if (values.difficulty) payload.difficulty = values.difficulty;
+    if (values.reference_solution) {
+      payload.reference_solution = values.reference_solution;
+    }
+    const imports = (values.test_imports ?? "")
+      .split(",")
+      .map((part) => part.trim())
+      .filter(Boolean);
+    if (imports.length) payload.test_imports = imports;
+
+    setSaving(true);
+    try {
+      const res = await fetch(
+        editing ? `/api/problems/${editing.id}` : "/api/problems",
+        {
+          method: editing ? "PUT" : "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        }
+      );
+      const body = (await res.json().catch(() => null)) as
+        | { error?: string }
+        | null;
+      if (!res.ok) throw new Error(body?.error ?? "保存失败");
+      if (editing) {
+        message.success(`已保存题目 #${editing.id}`);
+        // 本地同步轻量字段，虚拟列表无需重拉
+        setItems((prev) =>
+          prev.map((it) =>
+            it.id === editing.id
+              ? {
+                  ...it,
+                  title: values.title ?? it.title,
+                  difficulty: values.difficulty ?? it.difficulty,
+                  dataset_name: values.dataset_name,
+                  subset: values.subset ?? it.subset,
+                }
+              : it
+          )
+        );
+        setModalOpen(false);
+      } else {
+        message.success("已新增题目");
+        // 新题目的 id 在游标序列末尾，回到第一页重新加载
+        setModalOpen(false);
+        setReloadTick((t) => t + 1);
+      }
+    } catch (err) {
+      message.error((err as Error).message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  /** @description 删除题目：成功后从本地列表移除 */
+  async function remove(item: ProblemListItem) {
+    try {
+      const res = await fetch(`/api/problems/${item.id}`, {
+        method: "DELETE",
+      });
+      const body = (await res.json().catch(() => null)) as
+        | { error?: string }
+        | null;
+      if (!res.ok) throw new Error(body?.error ?? "删除失败");
+      message.success(`已删除题目 #${item.id}`);
+      setItems((prev) => prev.filter((it) => it.id !== item.id));
+    } catch (err) {
+      message.error((err as Error).message);
     }
   }
 
@@ -199,18 +402,21 @@ export default function ProblemList({
           value={dataset}
           onChange={(value) => setDataset(value)}
         />
-        <Typography.Text type="secondary">
-          已加载 {items.length} 题
-        </Typography.Text>
+        <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
+          新增题目
+        </Button>
       </Space>
 
-      {items.length === 0 ? (
-        <Empty description="暂无题目" />
-      ) : (
-        <div className="overflow-auto">
+      <div className="min-h-0 flex-1" ref={setListWrap}>
+        {items.length === 0 ? (
+          <Empty description="暂无题目" />
+        ) : (
           <Listy
+            virtual
+            height={listHeight}
             items={items}
             rowKey={(item) => item.id}
+            onScroll={handleListScroll}
             itemRender={(item) => (
               /* 行内布局自拼：左侧标题 + 标签与创建时间，右侧操作链接；
                内边距 / 分隔线 / hover 由 Listy 默认样式提供 */
@@ -245,30 +451,128 @@ export default function ProblemList({
                     </Typography.Text>
                   )}
                 </div>
-                <a
-                  href={
-                    itemHref
-                      ? itemHref(item)
-                      : `/problems/preview?id=${item.id}`
-                  }
-                  target="_blank"
-                  rel="noreferrer"
-                  className="shrink-0 ml-auto"
-                >
-                  {actionLabel}
-                </a>
+                <Space size={4} className="shrink-0 ml-auto">
+                  <a
+                    href={
+                      itemHref
+                        ? itemHref(item)
+                        : `/CodeAgent/practice?id=${item.id}`
+                    }
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    {actionLabel}
+                  </a>
+                  <Button
+                    type="link"
+                    size="small"
+                    style={{ paddingInline: 4 }}
+                    onClick={() => openEdit(item)}
+                  >
+                    编辑
+                  </Button>
+                  <Popconfirm
+                    title={`确定删除题目 #${item.id} 吗？`}
+                    okText="删除"
+                    cancelText="取消"
+                    okButtonProps={{ danger: true }}
+                    onConfirm={() => remove(item)}
+                  >
+                    <Button
+                      type="link"
+                      size="small"
+                      danger
+                      style={{ paddingInline: 4 }}
+                    >
+                      删除
+                    </Button>
+                  </Popconfirm>
+                </Space>
               </div>
             )}
           />
-        </div>
-      )}
+        )}
+      </div>
 
-      {/* 加载更多：游标分页由服务端控制是否有下一页 */}
-      {hasMore && (
-        <Button loading={loadingMore} onClick={loadMore}>
-          加载更多
-        </Button>
-      )}
+      {/* 底部状态：加载中显示 Spin，空闲时提示触底自动加载 */}
+      <Flex justify="center" align="center" style={{ height: 24 }}>
+        {loadingMore ? (
+          <Spin size="small" />
+        ) : (
+          <Typography.Text type="secondary">
+            {!hasMore && "没有更多题目了"}
+          </Typography.Text>
+        )}
+      </Flex>
+
+      {/* 新增/编辑弹窗：destroyOnHidden 保证每次打开都是全新表单 */}
+      <Modal
+        open={modalOpen}
+        title={editing ? `编辑题目 #${editing.id}` : "新增题目"}
+        okText="保存"
+        cancelText="取消"
+        okButtonProps={{ loading: saving }}
+        onOk={submit}
+        onCancel={() => setModalOpen(false)}
+        destroyOnHidden
+        width={640}
+      >
+        <Form form={form} layout="vertical">
+          <Flex gap={16}>
+            <Form.Item
+              name="dataset_name"
+              label="数据集"
+              rules={[{ required: true, message: "请选择数据集" }]}
+              style={{ flex: 1, minWidth: 0 }}
+            >
+              <Select options={DATASET_OPTIONS} />
+            </Form.Item>
+            <Form.Item
+              name="difficulty"
+              label="难度"
+              style={{ flex: 1, minWidth: 0 }}
+            >
+              <Select
+                allowClear
+                options={Object.keys(DIFFICULTY_COLORS).map((label) => ({
+                  label,
+                  value: label,
+                }))}
+              />
+            </Form.Item>
+            <Form.Item
+              name="subset"
+              label="子集"
+              style={{ flex: 1, minWidth: 0 }}
+            >
+              <Input placeholder="可选" />
+            </Form.Item>
+          </Flex>
+          <Form.Item name="title" label="标题">
+            <Input placeholder="可选" />
+          </Form.Item>
+          <Form.Item
+            name="prompt"
+            label="题面"
+            rules={[{ required: true, message: "请输入题面" }]}
+          >
+            <Input.TextArea rows={6} />
+          </Form.Item>
+          <Form.Item
+            name="test_cases"
+            label="测试用例（JSON 数组，元素为字符串或对象）"
+            rules={[{ required: true, message: "请输入测试用例" }]}
+          >
+            <Input.TextArea rows={6} style={{ fontFamily: "monospace" }} />
+          </Form.Item>
+          <Form.Item name="test_imports" label="测试额外导入（逗号分隔）">
+            <Input placeholder="如：math, itertools" />
+          </Form.Item>
+          <Form.Item name="reference_solution" label="参考题解">
+            <Input.TextArea rows={4} />
+          </Form.Item>
+        </Form>
+      </Modal>
     </div>
   );
 }

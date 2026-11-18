@@ -1,5 +1,18 @@
 import { NextResponse } from "next/server";
-import { callPython, errorResponse } from "@/lib/pythonApi";
+import { callPython, errorResponse, forwardJsonBody } from "@/lib/pythonApi";
+
+/**
+ * @description 新增题目：转发 POST /api/problems，业务校验由 Python 端实现
+ * @param req 前端请求，JSON body 为题目完整字段（dataset_name / prompt / test_cases 必填）
+ * @returns {ok, data}：data 为新建的题目
+ */
+export async function POST(req: Request): Promise<NextResponse> {
+  const { ok, status, body } = await callPython(
+    "/api/problems",
+    await forwardJsonBody(req)
+  );
+  return ok ? NextResponse.json(body) : errorResponse(status, body);
+}
 
 /**
  * @description 获取题目（只读）：全部逻辑由 Python 服务端实现，本路由仅做转发。
