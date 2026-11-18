@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button, Card, Input, Space, Spin, Typography, theme } from "antd";
-import { ReloadOutlined } from "@ant-design/icons";
+import { DownloadOutlined, ReloadOutlined } from "@ant-design/icons";
 import PageLayout from "@/components/PageLayout";
 import PageHeader from "@/components/PageHeader";
 
@@ -104,6 +104,49 @@ function isColorLike(value: string): boolean {
   return !!value && CSS.supports("color", value);
 }
 
+// 静态变量文件（public/ant-css-vars.json）的单个变量条目
+type StaticVarEntry = {
+  name: string; // 变量名，如 --ant-layout-sider-bg
+  scope: string; // 声明该变量的选择器（组件级变量只在组件类名作用域内生效）
+  rawValue: string; // 样式表原始值，可能是 var() 引用
+  value: string; // 解析后的实际渲染值
+};
+
+// 静态变量文件的顶层格式：按全局 token（key 固定 "global"）/ 组件首段分组，
+// exportedAt 记录快照时间，方便人读与脚本消费
+type StaticVarDump = {
+  exportedAt: string;
+  total: number;
+  groups: Record<string, StaticVarEntry[]>;
+};
+
+// 从扁平变量列表构建分组快照：全局 token 归入 "global"，其余按变量名首段（组件名）分组
+function buildVarDump(vars: CssVarInfo[]): StaticVarDump {
+  const groups: Record<string, StaticVarEntry[]> = {};
+  for (const info of vars) {
+    const segment = info.name.replace("--ant-", "").split("-")[0];
+    const groupKey = GLOBAL_SEGMENTS.has(segment) ? "global" : segment;
+    const list = groups[groupKey] ?? [];
+    list.push({
+      name: info.name,
+      scope: info.scope,
+      rawValue: info.rawValue,
+      value: info.value || info.rawValue,
+    });
+    groups[groupKey] = list;
+  }
+  return {
+    exportedAt: new Date().toISOString(),
+    total: vars.length,
+    groups,
+  };
+}
+
+// 快照文件 → 渲染用的扁平列表（条目结构与 CssVarInfo 同构）
+function dumpToVars(dump: StaticVarDump): CssVarInfo[] {
+  return Object.values(dump.groups).flat();
+}
+
 /**
  * @description CSS 变量浏览器：实时扫描页面样式表中 antd 注入的全部 --ant-* 变量，
  *              按全局 / 组件分组展示变量名与实际渲染值；扫描结果取决于应用已渲染过的组件
@@ -112,18 +155,58 @@ export default function CssVarsPage() {
   const { token } = theme.useToken();
   const [vars, setVars] = useState<CssVarInfo[] | null>(null);
   const [keyword, setKeyword] = useState("");
+  // 数据来源：static = public/ant-css-vars.json 快照；scan = 实时扫描样式表
+  const [source, setSource] = useState<"scan" | "static">("scan");
+  const [staticExportedAt, setStaticExportedAt] = useState<string | null>(null);
 
-  const scan = () => {
+  // 实时扫描：结果取决于应用已渲染过的组件
+  const scan = useCallback(() => {
     const collected = collectAntCssVars().map((info) => ({
       ...info,
       value: resolveValue(info.scope, info.name) || info.rawValue,
     }));
     setVars(collected);
-  };
-
-  useEffect(() => {
-    scan();
+    setSource("scan");
+    setStaticExportedAt(null);
   }, []);
+
+  // 优先加载静态快照 public/ant-css-vars.json（离线文档场景，可读格式见 StaticVarDump）；
+  // 文件不存在（404）或解析失败时回退实时扫描
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/ant-css-vars.json")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((dump) => {
+        if (cancelled) return;
+        if (dump?.groups) {
+          setVars(dumpToVars(dump as StaticVarDump));
+          setStaticExportedAt((dump.exportedAt as string) ?? null);
+          setSource("static");
+        } else {
+          scan();
+        }
+      })
+      .catch(() => {
+        if (!cancelled) scan();
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [scan]);
+
+  // 导出当前列表为可读 JSON 快照：下载后放入 public/ 即成为静态变量文件
+  const downloadDump = () => {
+    if (!vars) return;
+    const blob = new Blob([JSON.stringify(buildVarDump(vars), null, 2)], {
+      type: "application/json",
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "ant-css-vars.json";
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   // 按首段分组：color/font/size 等属于全局 token，其余视为组件 token
   const groups = useMemo(() => {
@@ -188,6 +271,12 @@ export default function CssVarsPage() {
             等）在任意位置均可引用。
             变量在组件首次渲染后才会注入，本页扫描结果来自应用已渲染过的组件。
           </Typography.Paragraph>
+          <Typography.Paragraph>
+            数据来源：优先加载静态快照{" "}
+            <Typography.Text code>public/ant-css-vars.json</Typography.Text>
+            （主题快照，适合文档速查；把「导出 JSON」下载的文件放回 public/
+            即可启用），文件缺失时回退实时扫描（当前主题的实际注入值）。
+          </Typography.Paragraph>
         </Typography>
       </Card>
 
@@ -201,11 +290,22 @@ export default function CssVarsPage() {
           onChange={(e) => setKeyword(e.target.value)}
         />
         <Button icon={<ReloadOutlined />} onClick={scan}>
-          重新扫描
+          实时扫描
+        </Button>
+        <Button
+          icon={<DownloadOutlined />}
+          disabled={!vars}
+          onClick={downloadDump}
+        >
+          导出 JSON
         </Button>
         {vars && (
           <Typography.Text type="secondary">
-            共 {vars.length} 个变量
+            共 {vars.length} 个变量（来源：
+            {source === "static"
+              ? `静态快照 ${staticExportedAt ?? ""}`
+              : "实时扫描"}
+            ）
           </Typography.Text>
         )}
       </Space>
