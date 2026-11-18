@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Card, Typography, message } from "antd";
+import { Typography, message } from "antd";
 import dayjs from "dayjs";
 import PageLayout from "@/components/PageLayout";
 import CrudManager from "@/components/CrudManager";
@@ -123,8 +123,7 @@ export default function AdminUsersPage() {
 
   return (
     <PageLayout>
-      <Card>
-        <CrudManager
+      <CrudManager
           title="用户"
           fields={USER_FIELDS}
           rows={rows ?? []}
@@ -171,7 +170,6 @@ export default function AdminUsersPage() {
             await load();
           }}
         />
-      </Card>
     </PageLayout>
   );
 }
