@@ -1,17 +1,13 @@
 "use client";
 
 import PageLayout from "@/components/PageLayout";
-import PageHeader from "@/components/PageHeader";
 import ProblemList from "@/components/ProblemList";
 
 // CodeAgent 练习入口：题库列表（原 ?tab=problems，统一迁移为子路由）
 export default function CodeAgentProblemsPage() {
   return (
-    <PageLayout contentClassName="bg-(--ant-color-bg-container) p-2">
-      <ProblemList
-        itemHref={(item) => `/CodeAgent/practice?id=${item.id}`}
-        actionLabel="开始练习"
-      />
+    <PageLayout>
+      <ProblemList />
     </PageLayout>
   );
 }

@@ -31,3 +31,13 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* 布局卡片：需要占满父容器高度的 antd Card，根节点与 .ant-card-body 同步撑满，
+   子页面才能在 Card 内继续用 h-full / flex 铺满（如 PageLayout 的内容卡） */
+.layout-fill-card {
+  height: 100%;
+}
+
+.layout-fill-card > .ant-card-body {
+  height: 100%;
+}

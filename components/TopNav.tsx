@@ -26,7 +26,11 @@ import {
   UserOutlined,
 } from "@ant-design/icons";
 import { usePathname, useRouter } from "next/navigation";
-import { NAV_GROUPS, getActiveGroup } from "./navConfig";
+import {
+  NAV_GROUPS,
+  flattenNavChildren,
+  getActiveGroup,
+} from "./navConfig";
 import { useThemeMode, type ThemeMode } from "./useThemeMode";
 import { clearSessionUser, getSessionUser, type SessionUser } from "@/lib/session";
 
@@ -71,11 +75,12 @@ export default function TopNav({
   const pathname = usePathname();
   const router = useRouter();
   const activeGroup = getActiveGroup(pathname);
-  // 与 SideNav 同一算法：当前 URL 匹配到的二级菜单 key（子路由前缀匹配），
-  // 用于弹出面板高亮当前项；无命中时高亮分组第一项
-  const currentKey =
-    activeGroup.children.find((child) => pathname.startsWith(child.key))?.key ??
-    activeGroup.children[0]?.key;
+  // 与 SideNav 同一算法：叶子节点里取最长前缀命中的 key（子路由归入所属菜单项），
+  // 用于弹出面板高亮当前项；无命中时不高亮任何项
+  const leaves = flattenNavChildren(activeGroup.children);
+  const currentKey = leaves
+    .filter((child) => pathname.startsWith(child.key))
+    .sort((a, b) => b.key.length - a.key.length)[0]?.key;
   const [searchOpen, setSearchOpen] = useState(false);
   const [keyword, setKeyword] = useState("");
   const { token } = theme.useToken();
@@ -95,12 +100,12 @@ export default function TopNav({
     boxShadow: token.boxShadowSecondary,
   };
 
-  // 一级菜单：children 换成带描述的大块菜单项，触发 mega-menu 弹出面板
+  // 一级菜单：弹出面板平铺展示叶子菜单项（嵌套子级展开为同级卡片，带描述的大块菜单项）
   const navItems: MenuProps["items"] = NAV_GROUPS.map((group) => ({
     key: group.key,
     icon: group.icon,
     label: group.label,
-    children: group.children.map((child) => ({
+    children: flattenNavChildren(group.children).map((child) => ({
       key: child.key,
       label: (
         <NavMenuItem
@@ -161,14 +166,17 @@ export default function TopNav({
         style={{ flex: 1, minWidth: 0, borderBottom: "none" }}
         items={navItems}
         popupRender={popupRender}
-        // 点击一级菜单跳到该分组第一项；点击弹出面板里的子菜单直接跳对应路由
+        // 点击一级菜单跳到该分组的第一个叶子项；点击弹出面板里的子菜单直接跳对应路由
         onClick={({ key }) => {
           if (key.startsWith("/")) {
             router.push(key);
             return;
           }
           const group = NAV_GROUPS.find((item) => item.key === key);
-          if (group) router.push(group.children[0].key);
+          if (group) {
+            const firstLeaf = flattenNavChildren(group.children)[0]?.key;
+            if (firstLeaf) router.push(firstLeaf);
+          }
         }}
       />
       <style jsx global>{`

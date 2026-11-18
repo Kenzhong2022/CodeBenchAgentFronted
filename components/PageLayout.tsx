@@ -2,7 +2,7 @@
 
 import { Suspense, useState } from "react";
 import type { ReactNode } from "react";
-import { App as AntApp, Layout, theme } from "antd";
+import { App as AntApp, Layout, Card, theme } from "antd";
 import { usePathname } from "next/navigation";
 import TopNav from "./TopNav";
 import SideNav from "./SideNav";
@@ -17,15 +17,19 @@ const { Content } = Layout;
  * @param header 页头插槽（可选）：渲染在内容区上方、高度由内容决定，不参与内容区滚动
  * @param contentClassName 内容区包裹层 className（可选）：内容区为 flex 列布局、
  *              包裹层自动 flex:1 占满 header 以下的剩余高度，可用 h-full / overflow-* 控制子内容
+ * @param card 是否用白卡包裹内容（默认 true，layout-fill-card 占满高度）；
+ *              页面自行组合卡片的（如预览页、拼装多卡片的仪表盘）传 false 退出
  */
 export default function PageLayout({
   header,
   children,
   contentClassName,
+  card = true,
 }: {
   header?: ReactNode;
   children: ReactNode;
   contentClassName?: string;
+  card?: boolean;
 }) {
   const pathname = usePathname();
   const activeGroup = getActiveGroup(pathname);
@@ -64,7 +68,6 @@ export default function PageLayout({
           <Content
             style={{
               margin: 24,
-              borderRadius: borderRadiusLG,
               flex: 1,
               overflow: "auto",
               // flex 列布局：标题区固定，包裹层 flex:1 占满剩余高度，供子页面 h-full 填充
@@ -74,8 +77,10 @@ export default function PageLayout({
           >
             {/* 页头插槽：内容由页面自行组合（PageHeader / 自定义节点），高度随内容收缩 */}
             {header && <div className="shrink-0 self-start">{header}</div>}
-            <div className={contentClassName} style={{ flex: 1, minHeight: 0 }}>
-              {children}
+            <div className={`flex-1 ${contentClassName}`}>
+              {/* 默认白卡包裹（layout-fill-card 占满高度，规则见 globals.css）；
+                  card=false 时原样渲染 children，页面自行决定容器 */}
+              {card ? <Card className="layout-fill-card">{children}</Card> : children}
             </div>
           </Content>
         </Layout>

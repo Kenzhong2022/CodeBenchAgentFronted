@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { App } from "antd";
 import { CopyOutlined } from "@ant-design/icons";
+import { Card } from "antd";
 import ChatContent from "./components/ChatContent";
 import ChatInput, {
   DEFAULT_MODEL_CONFIG,
@@ -76,7 +77,10 @@ export default function AssistantContainer() {
   function handleSend(text: string) {
     nextIdRef.current += 1;
     const messageId = `local-${nextIdRef.current}`;
-    setMessages((prev) => [...prev, { id: messageId, role: "user", content: text }]);
+    setMessages((prev) => [
+      ...prev,
+      { id: messageId, role: "user", content: text },
+    ]);
 
     // 组装请求体：会话 ID 首次生成；父消息取当前列表最后一条（会话首条为 null）；
     // ref_file_ids / preempt 对应的功能未实现，暂不携带
@@ -85,7 +89,8 @@ export default function AssistantContainer() {
     }
     const request: ChatRequest = {
       chat_session_id: sessionIdRef.current,
-      parent_message_id: messages.length > 0 ? messages[messages.length - 1].id : null,
+      parent_message_id:
+        messages.length > 0 ? messages[messages.length - 1].id : null,
       prompt: text,
       model_type: modelConfig.model,
       search_enabled: modelConfig.webSearch,
@@ -96,19 +101,21 @@ export default function AssistantContainer() {
   }
 
   return (
-    <div className="flex h-full flex-col ">
-      {/* 消息区：min-h-0 + flex-1 保证内部滚动而不撑开外层 */}
-      <div className="min-h-0 flex-1">
-        <ChatContent messages={messages} actionsOf={actionsOf} />
+    <Card className="layout-fill-card">
+      <div className="flex flex-col h-full">
+        {/* 消息区：min-h-0 + flex-1 保证内部滚动而不撑开外层 */}
+        <div className="min-h-0 flex-1">
+          <ChatContent messages={messages} actionsOf={actionsOf} />
+        </div>
+        {/* 输入区：固定在内容区底部，不随消息滚动 */}
+        <div className="pb-4">
+          <ChatInput
+            config={modelConfig}
+            onConfigChange={setModelConfig}
+            onSend={handleSend}
+          />
+        </div>
       </div>
-      {/* 输入区：固定在内容区底部，不随消息滚动 */}
-      <div className="pb-4">
-        <ChatInput
-          config={modelConfig}
-          onConfigChange={setModelConfig}
-          onSend={handleSend}
-        />
-      </div>
-    </div>
+    </Card>
   );
 }

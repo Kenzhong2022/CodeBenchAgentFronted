@@ -17,14 +17,30 @@ export type NavGroup = {
   key: string;
   label: string;
   icon?: ReactNode;
-  // 二级菜单项，key 即带 tab 参数的目标路由；description 用于顶部导航弹出面板
-  children: {
-    key: string;
-    label: string;
-    description?: string;
-    icon?: ReactNode;
-  }[];
+  // 二级菜单项，key 即目标路由；支持再嵌套 children 形成三级菜单（父项为分组，
+  // 自身不可跳转，点击展开子级），description 用于顶部导航弹出面板
+  children: NavChild[];
 };
+
+export type NavChild = {
+  key: string;
+  label: string;
+  description?: string;
+  icon?: ReactNode;
+  children?: NavChild[];
+};
+
+/**
+ * @description 展开菜单树的所有叶子节点（跳过带 children 的分组层）：
+ *              侧边栏选中匹配、顶部弹出面板平铺展示都以叶子为准
+ */
+export function flattenNavChildren(children: NavChild[]): NavChild[] {
+  return children.flatMap((child) =>
+    child.children?.length
+      ? flattenNavChildren(child.children)
+      : [child],
+  );
+}
 
 /**
  * 一级导航配置
@@ -34,18 +50,6 @@ export type NavGroup = {
  * 按路由分包与 middleware 前缀守卫；各模块根路径（/problems 等）重定向到默认子页
  */
 export const NAV_GROUPS: NavGroup[] = [
-  {
-    key: "/problems",
-    label: "题目中心",
-    children: [
-      {
-        key: "/problems/list",
-        label: "题目列表",
-        description: "游标分页浏览题库，按数据集筛选",
-        icon: <BookOutlined />,
-      },
-    ],
-  },
   {
     key: "/colors",
     label: "色系",
@@ -86,7 +90,7 @@ export const NAV_GROUPS: NavGroup[] = [
       },
       {
         key: "/CodeAgent/problems",
-        label: "练习",
+        label: "题库",
         description: "选择题目进入在线练习",
         icon: <CodeOutlined />,
       },
@@ -98,8 +102,8 @@ export const NAV_GROUPS: NavGroup[] = [
       },
       {
         key: "/CodeAgent/playground",
-        label: "自定义运行",
-        description: "多语言代码沙箱运行（Playground）",
+        label: "快速执行",
+        description: "临时执行简单代码脚本（多语言沙箱）",
         icon: <PlayCircleOutlined />,
       },
     ],
@@ -114,6 +118,12 @@ export const NAV_GROUPS: NavGroup[] = [
         label: "仪表盘",
         description: "后台运营数据总览（规划中）",
         icon: <DashboardOutlined />,
+      },
+      {
+        key: "/admin/problems",
+        label: "题目管理",
+        description: "题库浏览与增删改查，按数据集筛选",
+        icon: <BookOutlined />,
       },
       {
         key: "/admin/users",
@@ -137,9 +147,15 @@ export const NAV_GROUPS: NavGroup[] = [
   },
 ];
 
-// 按当前路径找到所属的一级导航，找不到时默认第一个
+// 按当前路径找到所属的一级导航：优先匹配分组 key，其次匹配任意二级子项 key
+// （如 /problems/list 归属 /admin 分组，路径前缀与分组 key 不同）；
+// 找不到时默认第一个
 export function getActiveGroup(pathname: string): NavGroup {
   return (
-    NAV_GROUPS.find((group) => pathname.startsWith(group.key)) ?? NAV_GROUPS[0]
+    NAV_GROUPS.find(
+      (group) =>
+        pathname.startsWith(group.key) ||
+        group.children.some((child) => pathname.startsWith(child.key)),
+    ) ?? NAV_GROUPS[0]
   );
 }

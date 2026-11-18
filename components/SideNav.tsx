@@ -1,12 +1,15 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { Layout, Menu, theme } from "antd";
 import { usePathname, useRouter } from "next/navigation";
+import { flattenNavChildren, type NavChild } from "./navConfig";
 
-type SideItem = { key: string; label: string; icon?: ReactNode };
+type SideItem = NavChild;
 
-// 侧边栏：只负责渲染传入的二级菜单项；收缩状态由顶部传入
+// 侧边栏：渲染传入的二级菜单树（叶子为路由项，带 children 的项渲染为可展开的子菜单）；
+// 收缩状态由顶部传入
 export default function SideNav({
   groupKey,
   items,
@@ -17,13 +20,31 @@ export default function SideNav({
   collapsed: boolean;
 }) {
   const router = useRouter();
-  // 子路由前缀匹配当前项（如 /CodeAgent/practice 归入 /CodeAgent/problems 不命中，
-  // 此时回退高亮第一项）；不再读取 ?tab= 查询参数
   const pathname = usePathname();
-  const selectedKey =
-    items.find((item) => pathname.startsWith(item.key))?.key ??
-    items[0]?.key ??
-    groupKey;
+  // 选中匹配以叶子为准、取最长前缀命中（如 /admin/problems/detail 归入
+  // /admin/problems 而非 /admin）；匹配不上时不高亮任何项
+  const leaves = flattenNavChildren(items);
+  const selectedKey = leaves
+    .filter((item) => pathname.startsWith(item.key))
+    .sort((a, b) => b.key.length - a.key.length)[0]?.key;
+  // 深链进入子菜单时自动展开对应父项（如直接访问分组内页）
+  const [openKeys, setOpenKeys] = useState<string[]>(() =>
+    items
+      .filter((item) => item.children?.length && pathname.startsWith(item.key))
+      .map((item) => item.key),
+  );
+  // 站内导航进入新的子菜单范围时追加展开，已手动折叠的不强开
+  useEffect(() => {
+    setOpenKeys((prev) => {
+      const next = new Set(prev);
+      for (const item of items) {
+        if (item.children?.length && pathname.startsWith(item.key)) {
+          next.add(item.key);
+        }
+      }
+      return [...next];
+    });
+  }, [pathname, items]);
   const { token } = theme.useToken();
 
   return (
@@ -43,13 +64,18 @@ export default function SideNav({
           }}
         />
         <Menu
-        // key 变化时重建菜单，避免上一组菜单的选中态残留
-        key={groupKey}
-        theme="light"
-        mode="inline"
-        selectedKeys={[selectedKey]}
-        items={items}
-        onClick={({ key }) => router.push(key)}
+          // key 变化时重建菜单，避免上一组菜单的选中态与展开态残留
+          key={groupKey}
+          theme="light"
+          mode="inline"
+          selectedKeys={selectedKey ? [selectedKey] : []}
+          openKeys={collapsed ? [] : openKeys}
+          onOpenChange={(keys) => setOpenKeys([...keys])}
+          items={items}
+          onClick={({ key }) => {
+            // 叶子 key 均为路由路径；分组父项点击只展开/收起，不跳转
+            if (key.startsWith("/")) router.push(key);
+          }}
         />
       </div>
     </Layout.Sider>
