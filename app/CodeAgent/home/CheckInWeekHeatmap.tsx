@@ -200,5 +200,15 @@ export default function CheckInWeekHeatmap({
     chart.current?.setOption(buildWeekOption({ theme, today, getValue }), true);
   }, [theme, today, getValue]);
 
-  return <div ref={el} style={{ width: "100%" }} />;
+  return (
+    <div
+      ref={el}
+      style={{
+        width: "100%",
+        // 先给最小高度再 init，避免 echarts.init 因高度为 0 拒绝测量；
+        // 实际高度由下方 ResizeObserver 按容器宽度重算
+        minHeight: 60,
+      }}
+    />
+  );
 }

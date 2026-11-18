@@ -175,6 +175,7 @@ export default function CheckInMonthHeatmap({
   // 初始化 + ResizeObserver
   useEffect(() => {
     if (!el.current) return;
+    // 高度已由 render 阶段的行内样式给定，此时 init 才能测到非零尺寸
     const c = echarts.getInstanceByDom(el.current) || echarts.init(el.current);
     chart.current = c;
 
@@ -188,13 +189,9 @@ export default function CheckInMonthHeatmap({
     };
   }, []);
 
-  // 数据 / 主题变化 → 重设容器高度 + 重建 option
+  // 数据 / 主题变化 → 重建 option
   useEffect(() => {
     if (!el.current) return;
-
-    // 月图高度 = 行数 × 行高 + 顶部周几轴(28) + 底部留白(4)
-    el.current.style.height =
-      monthInfo.weekCount * theme.monthRowHeight + 28 + 4 + "px";
 
     chart.current?.setOption(
       buildMonthOption({ theme, today, getValue, monthInfo }),
@@ -202,5 +199,15 @@ export default function CheckInMonthHeatmap({
     );
   }, [theme, today, getValue, monthInfo]);
 
-  return <div ref={el} style={{ width: "100%" }} />;
+  return (
+    <div
+      ref={el}
+      style={{
+        width: "100%",
+        // 月图高度 = 行数 × 行高 + 顶部周几轴(28) + 底部留白(4)；
+        // 必须在 render 阶段就给定高度，否则 echarts.init 会因高度为 0 拒绝测量
+        height: monthInfo.weekCount * theme.monthRowHeight + 28 + 4,
+      }}
+    />
+  );
 }
