@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { App as AntApp, Button, Form, Input } from "antd";
 import { GoogleOutlined } from "@ant-design/icons";
 import AuthBrandPanel from "@/components/AuthBrandPanel";
+import Turnstile from "@/components/Turnstile";
 import { setSessionUser } from "@/lib/session";
 
 /** 登录表单数据类型 */
@@ -31,18 +32,27 @@ function LoginView() {
   const router = useRouter();
   const { message } = AntApp.useApp();
   const [loading, setLoading] = useState(false);
+  // Turnstile 人机验证令牌：一次性消费，提交失败后重置组件重取
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const [captchaReset, setCaptchaReset] = useState(0);
 
   async function handleLogin(values: LoginForm) {
+    if (!captchaToken) {
+      message.warning("请先完成人机验证");
+      return;
+    }
     setLoading(true);
     try {
       const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(values),
+        body: JSON.stringify({ ...values, turnstileToken: captchaToken }),
       });
       const data = await res.json();
       if (!res.ok) {
         message.error(data.error ?? "登录失败");
+        // 令牌已被 siteverify 消费，重置组件重新获取
+        setCaptchaReset((k) => k + 1);
         return;
       }
       message.success(`欢迎回来，${data.user.name}！`);
@@ -53,6 +63,7 @@ function LoginView() {
       router.push("/");
     } catch {
       message.error("网络错误，请稍后重试");
+      setCaptchaReset((k) => k + 1);
     } finally {
       setLoading(false);
     }
@@ -91,6 +102,15 @@ function LoginView() {
               <Input.Password
                 placeholder="密码"
                 autoComplete="current-password"
+              />
+            </Form.Item>
+
+            {/* Turnstile 人机验证：token 随登录请求提交给服务端 siteverify */}
+            <Form.Item className="mb-2">
+              <Turnstile
+                action="login"
+                onToken={setCaptchaToken}
+                resetKey={captchaReset}
               />
             </Form.Item>
 

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { App as AntApp, Button, Form, Input, type FormInstance } from "antd";
 import AuthBrandPanel from "@/components/AuthBrandPanel";
+import Turnstile from "@/components/Turnstile";
 
 /** 注册表单数据类型 */
 interface RegisterForm {
@@ -36,6 +37,12 @@ function RegisterView() {
   const [sending, setSending] = useState(false);
   const [countdown, setCountdown] = useState(0);
   const [form] = Form.useForm<RegisterForm>();
+  // Turnstile 人机验证令牌：发码与注册各一个组件（action 不同、令牌一次性消费），
+  // 提交失败后通过 resetKey 重置重取
+  const [sendToken, setSendToken] = useState<string | null>(null);
+  const [sendReset, setSendReset] = useState(0);
+  const [regToken, setRegToken] = useState<string | null>(null);
+  const [regReset, setRegReset] = useState(0);
 
   // 发送验证码的 60 秒倒计时
   useEffect(() => {
@@ -50,38 +57,49 @@ function RegisterView() {
       message.warning("请先输入合法的邮箱地址");
       return;
     }
+    if (!sendToken) {
+      message.warning("请先完成人机验证再发送验证码");
+      return;
+    }
     setSending(true);
     try {
       const res = await fetch("/api/auth/send-code", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ email, turnstileToken: sendToken }),
       });
       const data = await res.json();
       if (!res.ok) {
         message.error(data.error ?? "发送失败");
+        setSendReset((k) => k + 1);
         return;
       }
       message.success(`验证码已发送至 ${email}，请查收邮件（5 分钟内有效）`);
       setCountdown(60);
     } catch {
       message.error("网络错误，请稍后重试");
+      setSendReset((k) => k + 1);
     } finally {
       setSending(false);
     }
   }
 
   async function handleRegister(values: RegisterForm) {
+    if (!regToken) {
+      message.warning("请先完成人机验证");
+      return;
+    }
     setLoading(true);
     try {
       const res = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(values),
+        body: JSON.stringify({ ...values, turnstileToken: regToken }),
       });
       const data = await res.json();
       if (!res.ok) {
         message.error(data.error ?? "注册失败");
+        setRegReset((k) => k + 1);
         return;
       }
       message.success(`注册成功，${data.user.name}！请登录`);
@@ -90,6 +108,7 @@ function RegisterView() {
       router.push("/login");
     } catch {
       message.error("网络错误，请稍后重试");
+      setRegReset((k) => k + 1);
     } finally {
       setLoading(false);
     }
@@ -132,6 +151,15 @@ function RegisterView() {
               <Input placeholder="邮箱" autoComplete="email" />
             </Form.Item>
 
+            {/* 发码前的人机验证（action=send_code，防邮件轰炸） */}
+            <Form.Item className="mb-2">
+              <Turnstile
+                action="send_code"
+                onToken={setSendToken}
+                resetKey={sendReset}
+              />
+            </Form.Item>
+
             <Form.Item
               name="code"
               rules={[
@@ -172,6 +200,15 @@ function RegisterView() {
               <Input.Password
                 placeholder="密码（至少 6 位）"
                 autoComplete="new-password"
+              />
+            </Form.Item>
+
+            {/* 注册提交前的人机验证（action=register） */}
+            <Form.Item className="mb-2">
+              <Turnstile
+                action="register"
+                onToken={setRegToken}
+                resetKey={regReset}
               />
             </Form.Item>
 
