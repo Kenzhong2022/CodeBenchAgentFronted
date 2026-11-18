@@ -1,5 +1,4 @@
-import { errorResponse } from "@/lib/pythonApi";
-import type { NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 
 /**
  * 服务端 Turnstile siteverify 网关：浏览器 → 本后端 → siteverify，
@@ -34,7 +33,8 @@ export async function gateTurnstile(
 ): Promise<GateResult> {
   const fail = (message: string): GateResult => ({
     ok: false,
-    response: errorResponse(403, { error: message }),
+    // 注意不用 errorResponse：它按 FastAPI 的 body.detail 取文案，会丢失网关消息
+    response: NextResponse.json({ error: message }, { status: 403 }),
   });
 
   if (
@@ -58,6 +58,7 @@ export async function gateTurnstile(
     success?: boolean;
     action?: string;
     hostname?: string;
+    "error-codes"?: string[];
   };
   try {
     const res = await fetch(
@@ -85,6 +86,14 @@ export async function gateTurnstile(
     result.action !== expectedAction ||
     !EXPECTED_HOSTNAMES.has(result.hostname ?? "")
   ) {
+    // 打印 Cloudflare 原始失败原因：用于区分密钥错误 / action 错配 / 域名未授权 / token 无效过期
+    console.warn("[turnstile] siteverify 未通过", {
+      errorCodes: result["error-codes"],
+      expectedAction,
+      action: result.action,
+      hostname: result.hostname,
+      expectedHostnames: [...EXPECTED_HOSTNAMES],
+    });
     return fail("人机验证未通过，请重试");
   }
   return { ok: true, token: rawToken };

@@ -18,6 +18,25 @@ declare global {
   }
 }
 
+// 脚本加载单例：页面同时挂载多个组件实例时只注入一份 api.js，
+// 否则两份脚本各自触发 onload / challenge，产生双倍请求
+let scriptLoadPromise: Promise<void> | null = null;
+
+function loadTurnstileScript(): Promise<void> {
+  if (window.turnstile) return Promise.resolve();
+  if (!scriptLoadPromise) {
+    scriptLoadPromise = new Promise((resolve) => {
+      window.__onTurnstileLoad = resolve;
+      const script = document.createElement("script");
+      script.src =
+        "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit&onload=__onTurnstileLoad";
+      script.async = true;
+      document.head.appendChild(script);
+    });
+  }
+  return scriptLoadPromise;
+}
+
 /**
  * @description Cloudflare Turnstile 人机验证组件（显式渲染）：
  *              token 通过 onToken 上抛，验证过期 / 出错时置空；
@@ -63,12 +82,9 @@ export default function Turnstile({
     if (window.turnstile) {
       render();
     } else {
-      window.__onTurnstileLoad = render;
-      const script = document.createElement("script");
-      script.src =
-        "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit&onload=__onTurnstileLoad";
-      script.async = true;
-      document.head.appendChild(script);
+      void loadTurnstileScript().then(() => {
+        if (!cancelled) render();
+      });
     }
 
     return () => {
