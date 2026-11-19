@@ -16,15 +16,20 @@ const MeetingRoom = dynamic(() => import("./MeetingRoom"), {
 });
 
 /**
- * @description 1v1 视频 / 语音会议页：Suspense 是 useSearchParams 在预渲染阶段的
- *              必要边界；房间号由 MeetingRoom 写入地址栏以便分享
+ * @description 1v1 视频 / 语音会议页：useSearchParams 必须在 Suspense 边界内的
+ *              子组件中调用，否则预渲染阶段会 CSR bailout 导致构建失败；
+ *              房间号由 MeetingRoom 写入地址栏以便分享
  */
+function RoomFromQuery() {
+  return <MeetingRoom roomCode={useSearchParams().get("room")} />;
+}
+
 export default function MeetingPage() {
   return (
     <PageLayout card={false}>
       <div className="h-full min-h-0">
         <Suspense fallback={null}>
-          <MeetingRoom roomCode={useSearchParams().get("room")} />
+          <RoomFromQuery />
         </Suspense>
       </div>
     </PageLayout>
