@@ -10,13 +10,13 @@ import {
 import dayjs from "dayjs";
 import {
   Alert,
+  App as AntApp,
   Button,
   Empty,
   Flex,
   Form,
   Input,
   Listy,
-  message,
   Modal,
   Popconfirm,
   Segmented,
@@ -124,6 +124,7 @@ export default function ProblemList({
   actionLabel = "前往练习",
   onLanguageChange,
 }: ProblemListProps) {
+  const { message } = AntApp.useApp();
   const [items, setItems] = useState<ProblemListItem[]>([]);
   const [cursor, setCursor] = useState<string | number | null>(null);
   const [hasMore, setHasMore] = useState(false);

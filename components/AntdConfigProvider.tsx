@@ -2,10 +2,11 @@
 
 import type { ReactNode } from "react";
 import { useMemo } from "react";
-import { ConfigProvider, theme } from "antd";
+import { App, ConfigProvider, theme } from "antd";
 import zhCN from "antd/locale/zh_CN";
 import dayjs from "dayjs";
 import "dayjs/locale/zh-cn";
+import AntdAppBridge from "./AntdAppBridge";
 import { useThemeMode } from "./useThemeMode";
 
 dayjs.locale("zh-cn");
@@ -69,7 +70,11 @@ export default function AntdConfigProvider({
           },
         }}
       >
-        {children}
+        {/* 根级 App：全站任何组件都能 App.useApp()，message 弹层跟随主题 */}
+        <App>
+          <AntdAppBridge />
+          {children}
+        </App>
       </ConfigProvider>
     </>
   );

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Typography, message } from "antd";
+import { App as AntApp, Typography } from "antd";
 import dayjs from "dayjs";
 import PageLayout from "@/components/PageLayout";
 import CrudManager from "@/components/CrudManager";
@@ -75,6 +75,7 @@ const USER_FIELDS: CrudField[] = [
 // 用户管理页：数据与增删改全部走 /api/users（Next 转发 Python /api/users）。
 // 表格交互由通用 CrudManager 承担：服务端分页 + 关键字筛选 + 回调模式增删改
 export default function AdminUsersPage() {
+  const { message } = AntApp.useApp();
   const [rows, setRows] = useState<AdminUser[] | null>(null);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);

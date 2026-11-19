@@ -2,7 +2,7 @@
 
 import { Suspense, useState } from "react";
 import type { ReactNode } from "react";
-import { App as AntApp, Layout, Card, theme } from "antd";
+import { Layout, Card, theme } from "antd";
 import { usePathname } from "next/navigation";
 import TopNav from "./TopNav";
 import SideNav from "./SideNav";
@@ -40,51 +40,44 @@ export default function PageLayout({
   } = theme.useToken();
 
   return (
-    <AntApp>
-      {/* 外层：左右布局：左边侧边栏，右边内容区域 */}
-      <Layout style={{ minHeight: "100vh" }}>
-        <Suspense fallback={<Layout.Sider width={200} theme="light" />}>
-          <SideNav
-            groupKey={activeGroup.key}
-            items={activeGroup.children}
-            collapsed={collapsed}
-          />
+    // App 上下文已提升到根级 AntdConfigProvider，这里不再重复包 <App>
+    <Layout style={{ minHeight: "100vh" }}>
+      <Suspense fallback={<Layout.Sider width={200} theme="light" />}>
+        <SideNav
+          groupKey={activeGroup.key}
+          items={activeGroup.children}
+          collapsed={collapsed}
+        />
+      </Suspense>
+
+      {/* 右侧：上下布局（顶栏 / 内容区） */}
+      <Layout style={{ maxHeight: "calc(100vh)" }}>
+        {/* TopNav 内含使用导航路由的组件，保留 Suspense 边界；fallback 用同尺寸 Header 防止布局跳动 */}
+        <Suspense
+          fallback={<Layout.Header style={{ background: colorBgContainer }} />}
+        >
+          <TopNav collapsed={collapsed} onToggle={() => setCollapsed(!collapsed)} />
         </Suspense>
 
-        {/* 右侧：上下布局（顶栏 / 内容区） */}
-        <Layout style={{ maxHeight: "calc(100vh)" }}>
-          {/* TopNav 内含使用导航路由的组件，保留 Suspense 边界；fallback 用同尺寸 Header 防止布局跳动 */}
-          <Suspense
-            fallback={
-              <Layout.Header style={{ background: colorBgContainer }} />
-            }
-          >
-            <TopNav
-              collapsed={collapsed}
-              onToggle={() => setCollapsed(!collapsed)}
-            />
-          </Suspense>
-
-          <Content
-            style={{
-              margin: 24,
-              flex: 1,
-              overflow: "auto",
-              // flex 列布局：标题区固定，包裹层 flex:1 占满剩余高度，供子页面 h-full 填充
-              display: "flex",
-              flexDirection: "column",
-            }}
-          >
-            {/* 页头插槽：内容由页面自行组合（PageHeader / 自定义节点），高度随内容收缩 */}
-            {header && <div className="shrink-0 self-start">{header}</div>}
-            <div className={`flex-1 ${contentClassName}`}>
-              {/* 默认白卡包裹（layout-fill-card 占满高度，规则见 globals.css）；
-                  card=false 时原样渲染 children，页面自行决定容器 */}
-              {card ? <Card className="layout-fill-card">{children}</Card> : children}
-            </div>
-          </Content>
-        </Layout>
+        <Content
+          style={{
+            margin: 24,
+            flex: 1,
+            overflow: "auto",
+            // flex 列布局：标题区固定，包裹层 flex:1 占满剩余高度，供子页面 h-full 填充
+            display: "flex",
+            flexDirection: "column",
+          }}
+        >
+          {/* 页头插槽：内容由页面自行组合（PageHeader / 自定义节点），高度随内容收缩 */}
+          {header && <div className="shrink-0 self-start">{header}</div>}
+          <div className={`flex-1 ${contentClassName}`}>
+            {/* 默认白卡包裹（layout-fill-card 占满高度，规则见 globals.css）；
+                card=false 时原样渲染 children，页面自行决定容器 */}
+            {card ? <Card className="layout-fill-card">{children}</Card> : children}
+          </div>
+        </Content>
       </Layout>
-    </AntApp>
+    </Layout>
   );
 }

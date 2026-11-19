@@ -18,7 +18,7 @@ import { DEFAULT_CODE } from "./runTests";
 /**
  * @description 练习页工作台：LeetCode 式左右 Splitter（题面 | 工作台），
  *              右侧内部上下 Splitter（编辑器 | 用例面板）。
- *              拆成独立组件是因为 App.useApp() 必须在 <AntApp>（PageLayout 内部）
+ *              拆成独立组件是因为 App.useApp() 必须在根级 <App>（AntdConfigProvider 内）
  *              的子组件中调用；题目数据来自父组件（page.tsx）拉取后传入
  */
 export default function PracticeWorkbench({
