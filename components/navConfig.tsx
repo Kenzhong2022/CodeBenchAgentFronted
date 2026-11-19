@@ -11,6 +11,7 @@ import {
   SafetyOutlined,
   SettingOutlined,
   TeamOutlined,
+  VideoCameraOutlined,
 } from "@ant-design/icons";
 
 export type NavGroup = {
@@ -105,6 +106,12 @@ export const NAV_GROUPS: NavGroup[] = [
         label: "快速执行",
         description: "临时执行简单代码脚本（多语言沙箱）",
         icon: <PlayCircleOutlined />,
+      },
+      {
+        key: "/CodeAgent/meeting",
+        label: "视频通话",
+        description: "创建 1v1 视频 / 语音通话房间并邀请对方",
+        icon: <VideoCameraOutlined />,
       },
     ],
   },

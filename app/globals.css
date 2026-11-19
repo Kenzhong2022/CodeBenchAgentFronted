@@ -41,3 +41,41 @@ body {
 .layout-fill-card > .ant-card-body {
   height: 100%;
 }
+
+/* 斜杠遮罩：斜线向外扩大一圈，超出父容器边界 */
+/* 用法：目标元素必须带 relative / absolute 定位，不要写 overflow:hidden */
+.slash-overlay::before {
+  content: "";
+  position: absolute;
+  inset: -1px; /* 向外扩展4px，修改这个值控制扩大范围 */
+  pointer-events: none;
+  background: linear-gradient(
+    135deg,
+    transparent calc(50% - var(--slash-width, 0.5px)),
+    var(--slash-color, #ef4444) calc(50% - var(--slash-width, 0.5px)),
+    var(--slash-color, #ef4444) calc(50% + var(--slash-width, 0.5px)),
+    transparent calc(50% + var(--slash-width, 0.5px))
+  );
+}
+
+.ant-input-borderless.ant-input:focus,
+.ant-input-borderless.ant-input:focus-within {
+  box-shadow: 0 0 0 0 transparent !important;
+  outline: none !important;
+}
+
+/* 可复用卡片悬浮效果：默认中等阴影；悬停时上浮 6px 并增强阴影，
+   所有属性变化 240ms 平滑过渡（阴影值即 Tailwind 的 shadow-md / shadow-xl） */
+.card-hover {
+  transition: all 240ms ease;
+  box-shadow:
+    0 4px 6px -1px rgb(0 0 0 / 0.1),
+    0 2px 4px -2px rgb(0 0 0 / 0.1);
+}
+
+.card-hover:hover {
+  transform: translateY(-6px);
+  box-shadow:
+    0 20px 25px -5px rgb(0 0 0 / 0.1),
+    0 8px 10px -6px rgb(0 0 0 / 0.1);
+}

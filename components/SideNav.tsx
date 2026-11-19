@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { Layout, Menu, theme } from "antd";
 import { usePathname, useRouter } from "next/navigation";
+import { canLeavePage } from "@/lib/leave-guard";
 import { flattenNavChildren, type NavChild } from "./navConfig";
 
 type SideItem = NavChild;
@@ -74,7 +75,11 @@ export default function SideNav({
           items={items}
           onClick={({ key }) => {
             // 叶子 key 均为路由路径；分组父项点击只展开/收起，不跳转
-            if (key.startsWith("/")) router.push(key);
+            if (!key.startsWith("/")) return;
+            // 当前页注册了离开守卫（如通话房间）时先确认再跳转
+            void canLeavePage().then((ok) => {
+              if (ok) router.push(key);
+            });
           }}
         />
       </div>

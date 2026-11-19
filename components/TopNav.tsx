@@ -26,6 +26,7 @@ import {
   UserOutlined,
 } from "@ant-design/icons";
 import { usePathname, useRouter } from "next/navigation";
+import { canLeavePage } from "@/lib/leave-guard";
 import {
   NAV_GROUPS,
   flattenNavChildren,
@@ -168,15 +169,19 @@ export default function TopNav({
         popupRender={popupRender}
         // 点击一级菜单跳到该分组的第一个叶子项；点击弹出面板里的子菜单直接跳对应路由
         onClick={({ key }) => {
-          if (key.startsWith("/")) {
-            router.push(key);
-            return;
-          }
-          const group = NAV_GROUPS.find((item) => item.key === key);
-          if (group) {
-            const firstLeaf = flattenNavChildren(group.children)[0]?.key;
-            if (firstLeaf) router.push(firstLeaf);
-          }
+          // 当前页注册了离开守卫（如通话房间）时先确认再跳转
+          void canLeavePage().then((ok) => {
+            if (!ok) return;
+            if (key.startsWith("/")) {
+              router.push(key);
+              return;
+            }
+            const group = NAV_GROUPS.find((item) => item.key === key);
+            if (group) {
+              const firstLeaf = flattenNavChildren(group.children)[0]?.key;
+              if (firstLeaf) router.push(firstLeaf);
+            }
+          });
         }}
       />
       <style jsx global>{`
@@ -256,11 +261,15 @@ export default function TopNav({
               selectedKeys: [mode],
               onClick: ({ key }) => {
                 if (key === "logout") {
-                  // 同时清除服务端会话 Cookie 与本地 UI 登录标记
-                  void fetch("/api/auth/logout", { method: "POST" });
-                  clearSessionUser();
-                  setUser(null);
-                  router.push("/login");
+                  // 当前页注册了离开守卫（如通话房间）时先确认再退出
+                  void canLeavePage().then((ok) => {
+                    if (!ok) return;
+                    // 同时清除服务端会话 Cookie 与本地 UI 登录标记
+                    void fetch("/api/auth/logout", { method: "POST" });
+                    clearSessionUser();
+                    setUser(null);
+                    router.push("/login");
+                  });
                   return;
                 }
                 if (["light", "dark", "system"].includes(key)) {
