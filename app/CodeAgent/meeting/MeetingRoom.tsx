@@ -22,8 +22,8 @@ type JoinState =
 
 /**
  * @description 会议流程编排层：管理空闲 → 接入中 → 进入前面板 → 通话中 → 出错 的状态机，
- *              负责换 token、初始化 RealtimeKit、离开守卫与页面卸载关闭房间；
- *              界面全部委托给 EntryPanel / PreJoin / Room 三个展示组件
+ *              负责换 token、初始化 RealtimeKit 与离开守卫；界面全部委托给
+ *              EntryPanel / PreJoin / Room 三个展示组件
  * @param roomCode 9 位短房间号；null 表示展示创建入口
  */
 export default function MeetingRoom({
@@ -92,16 +92,14 @@ export default function MeetingRoom({
   }, [initialRoomCode, join]);
 
   // 站内跳转（侧边栏 / 顶部导航 / 退出登录）前弹窗确认；
-  // 预览中与通话中都算「在房间里」：房主离开视为关闭房间，参与者直接退出
+  // 离开只是退出通话，房间保留：房主凭房间号可随时回来，关闭需在房间里显式操作
   useEffect(() => {
     if (state.status !== "prejoin" && state.status !== "joined") return;
     const guard = async () => {
       const confirmed = await new Promise<boolean>((resolve) => {
         modal.confirm({
           title: "离开页面？",
-          content: isHost
-            ? "离开页面会视为关闭当前房间，其他人将无法再加入。"
-            : "离开页面会退出当前通话。",
+          content: "离开页面会退出当前通话；房间会保留，凭房间号可以再次进入。",
           okText: "离开",
           cancelText: "取消",
           okButtonProps: { danger: true },
@@ -110,40 +108,24 @@ export default function MeetingRoom({
         });
       });
       if (!confirmed) return false;
-      // 房主离开视为关闭房间；关闭失败不阻塞离开，房间会随短号过期回收
-      if (isHost && roomCode) {
-        await fetch(`/api/realtime/rooms/${roomCode}/close`, {
-          method: "POST",
-          keepalive: true,
-        }).catch(() => null);
-      }
       if (state.status === "joined") await meeting.leave().catch(() => null);
       return true;
     };
     setLeaveGuard(guard);
     return () => clearLeaveGuard(guard);
-  }, [state.status, isHost, roomCode, meeting, modal]);
+  }, [state.status, meeting, modal]);
 
-  // 刷新 / 关闭标签页同样属于离开页面：先弹浏览器确认框，
-  // 确认后房主通过 beacon 关闭房间（页面卸载时普通 fetch 会被中断）
+  // 刷新 / 关闭标签页前弹浏览器确认框，防止误关丢会议；
+  // 房间不会因离开被关闭（关闭是房主在房间内的显式操作）
   useEffect(() => {
     if (state.status !== "prejoin" && state.status !== "joined") return;
     const onBeforeUnload = (event: BeforeUnloadEvent) => {
       event.preventDefault();
       event.returnValue = "";
     };
-    const onPageHide = () => {
-      if (isHost && roomCode) {
-        navigator.sendBeacon(`/api/realtime/rooms/${roomCode}/close`);
-      }
-    };
     window.addEventListener("beforeunload", onBeforeUnload);
-    window.addEventListener("pagehide", onPageHide);
-    return () => {
-      window.removeEventListener("beforeunload", onBeforeUnload);
-      window.removeEventListener("pagehide", onPageHide);
-    };
-  }, [state.status, isHost, roomCode]);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, [state.status]);
 
   // 房主关闭房间 / 预览阶段取消后回到创建入口
   const resetToIdle = useCallback(() => {

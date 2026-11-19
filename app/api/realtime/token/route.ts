@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { callPython } from "@/lib/pythonApi";
 import {
   clearUserRoom,
-  closeRoom,
   createRoomCode,
   getRoom,
   getUserRoom,
@@ -62,7 +61,8 @@ async function rtkPost<T>(
 
 /**
  * @description 一个用户同一时间只能关联一个房间：进入新房间前释放旧关联。
- *              旧房间若仍开放且属于该用户，则视为离开并关闭；否则只解除关联。
+ *              只解除关联不关闭房间——房间关闭是房主的显式操作（房间内「关闭房间」按钮），
+ *              临时切换后凭房间号仍可回到自己的房间；无主房间随短号 TTL 过期回收
  * @param userId 当前用户 ID
  * @param nextRoomCode 即将进入的房间号，与旧关联相同时不做处理
  */
@@ -72,12 +72,6 @@ async function releasePreviousRoom(
 ): Promise<void> {
   const previousCode = await getUserRoom(userId);
   if (!previousCode || previousCode === nextRoomCode) return;
-
-  const previousRoom = await getRoom(previousCode);
-  if (previousRoom?.status === "open" && previousRoom.ownerId === userId) {
-    await closeRoom(previousCode, userId);
-    return;
-  }
   await clearUserRoom(userId);
 }
 
