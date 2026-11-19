@@ -26,7 +26,12 @@
     // Cloudflare RealtimeKit（1v1 视频 / 语音通话）；API Token 为机密，用 `wrangler secret put` 设置
     "CLOUDFLARE_ACCOUNT_ID": "65844ae2478b17ef0b07680420bc454f",
     "REALTIMEKIT_APP_ID": "b864de47-60f4-4ba4-adf6-281a4807971d",
+    // Supabase：URL 与 anon key 设计上可公开，走明文 vars；S3 两个 key 是机密走 secret put
+    "SUPABASE_URL": "https://krgaimtoeuorzifkahsk.supabase.co",
+    "SUPABASE_ANON_KEY": "sb_publishable_2EwJxFI9RShlvkDNznumnw_Kzb0D5cD",
   },
   // ...
-  // 机密（SUPABASE_S3_ACCESS_KEY_ID / SUPABASE_S3_SECRET_ACCESS_KEY / CLOUDFLARE_REALTIME_API_TOKEN）用 `wrangler secret put` 设置
+  // 机密（TURNSTILE_SECRET / SUPABASE_S3_ACCESS_KEY_ID / SUPABASE_S3_SECRET_ACCESS_KEY /
+  // UPSTASH_REDIS_REST_URL / UPSTASH_REDIS_REST_TOKEN / CLOUDFLARE_REALTIME_API_TOKEN）
+  // 用 `npx wrangler secret put <NAME> --name codebenchagentfronted` 设置
 }
