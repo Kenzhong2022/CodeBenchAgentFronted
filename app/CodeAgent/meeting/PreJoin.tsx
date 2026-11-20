@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { ReactNode } from "react";
 import { App as AntApp, Button, Input, Select } from "antd";
 import {
   AudioMutedOutlined,
@@ -10,19 +9,8 @@ import {
 } from "@ant-design/icons";
 import { useRealtimeKitMeeting } from "@cloudflare/realtimekit-react";
 import { formatRoomCode } from "@/lib/room-code";
+import DisabledIcon from "@/components/DisabledIcon";
 import UnderlineInput from "@/components/UnderlineInput";
-
-/** @description 禁用态图标：红色 + 全局 .slash-overlay 斜线，用于按钮上的麦克风 / 摄像头关闭标记 */
-function SlashedIcon({ children }: { children: ReactNode }) {
-  return (
-    <span
-      className="slash-overlay relative inline-flex"
-      style={{ color: "#ef4444" }}
-    >
-      {children}
-    </span>
-  );
-}
 
 /**
  * @description 进入前面板：自绘设备预览（摄像头画面 / 麦克风与摄像头开关 / 设备切换 / 昵称），
@@ -71,6 +59,25 @@ export default function PreJoin({
   const [roomNameDraft, setRoomNameDraft] = useState("");
   const [renaming, setRenaming] = useState(false);
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  // RealtimeKit 的 enableVideo / enableAudio 不允许并发重入（在途再调会抛
+  // ERR1100）：Strict Mode 双挂载与快速连点都会触发，这里按媒体类型记录
+  // 在途调用去重
+  const mediaOpRef = useRef<{ video?: Promise<unknown>; audio?: Promise<unknown> }>({});
+  const runMediaOp = useCallback(
+    (
+      kind: "video" | "audio",
+      op: () => Promise<unknown>,
+      onError?: () => void,
+    ) => {
+      if (mediaOpRef.current[kind]) return;
+      mediaOpRef.current[kind] = op()
+        .catch(() => onError?.())
+        .finally(() => {
+          mediaOpRef.current[kind] = undefined;
+        });
+    },
+    [],
+  );
   // 预设决定加入后能否改昵称
   const canEditName = self.permissions.canEditDisplayName !== false;
 
@@ -79,8 +86,8 @@ export default function PreJoin({
     const el = videoRef.current;
     if (!el) return;
     self.registerVideoElement(el, true);
-    if (!self.videoEnabled) self.enableVideo().catch(() => null);
-    if (!self.audioEnabled) self.enableAudio().catch(() => null);
+    if (!self.videoEnabled) runMediaOp("video", () => self.enableVideo());
+    if (!self.audioEnabled) runMediaOp("audio", () => self.enableAudio());
 
     let mounted = true;
     const refreshDevices = async () => {
@@ -117,7 +124,7 @@ export default function PreJoin({
       self.removeListener("deviceUpdate", onDeviceUpdate);
       self.deregisterVideoElement(el, true);
     };
-  }, [self]);
+  }, [self, runMediaOp]);
 
   // 确认进入：昵称 + 加入；加入成功后由编排层切到通话界面
   const enterMeeting = useCallback(async () => {
@@ -134,16 +141,20 @@ export default function PreJoin({
   }, [canEditName, displayName, meeting, onEnter, self]);
 
   const toggleVideo = useCallback(() => {
-    void (videoEnabled ? self.disableVideo() : self.enableVideo()).catch(() =>
-      message.error("摄像头操作失败，请检查浏览器权限"),
+    runMediaOp(
+      "video",
+      () => (videoEnabled ? self.disableVideo() : self.enableVideo()),
+      () => message.error("摄像头操作失败，请检查浏览器权限"),
     );
-  }, [message, self, videoEnabled]);
+  }, [message, runMediaOp, self, videoEnabled]);
 
   const toggleAudio = useCallback(() => {
-    void (audioEnabled ? self.disableAudio() : self.enableAudio()).catch(() =>
-      message.error("麦克风操作失败，请检查浏览器权限"),
+    runMediaOp(
+      "audio",
+      () => (audioEnabled ? self.disableAudio() : self.enableAudio()),
+      () => message.error("麦克风操作失败，请检查浏览器权限"),
     );
-  }, [message, self, audioEnabled]);
+  }, [message, runMediaOp, self, audioEnabled]);
 
   const switchDevice = useCallback(
     async (deviceId?: string) => {
@@ -232,9 +243,9 @@ export default function PreJoin({
                 videoEnabled ? (
                   <VideoCameraOutlined />
                 ) : (
-                  <SlashedIcon>
+                  <DisabledIcon>
                     <VideoCameraOutlined />
-                  </SlashedIcon>
+                  </DisabledIcon>
                 )
               }
               onClick={toggleVideo}
