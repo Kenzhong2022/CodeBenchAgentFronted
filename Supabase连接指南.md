@@ -1,6 +1,6 @@
 # Supabase 数据库连接指南
 
-> 适用项目：react-project（Next.js + Supabase）。阅读本文后，你可以用项目提供的两个环境变量连接团队数据库并进行增删改查。
+> 适用项目：personal-playground-react（Next.js + Supabase）。阅读本文后，你可以用项目提供的两个环境变量连接团队数据库并进行增删改查。
 
 ## 1. 你会拿到两个变量
 
@@ -43,7 +43,7 @@ npm install @supabase/supabase-js
 
 ## 3. 创建客户端
 
-项目里已有封装好的客户端 [lib/supabase.ts](../lib/supabase.ts)，直接复用即可：
+项目未做额外封装，在**服务端代码**里用 `@supabase/supabase-js` 两行即可创建（需要时再抽成 `lib/supabase.ts` 统一导出）：
 
 ```ts
 import { createClient } from "@supabase/supabase-js";
@@ -137,7 +137,89 @@ curl http://localhost:3000/api/problems
 node -e "import('dotenv').then(d=>{d.config({path:'.env.local'});return import('@supabase/supabase-js')}).then(({createClient})=>{const s=createClient(process.env.SUPABASE_URL,process.env.SUPABASE_ANON_KEY);s.from('problems').select('id').limit(1).then(r=>console.log(r.error?'失败:'+r.error.message:'✅ 连接成功'))})"
 ```
 
-## 6. 常见问题
+## 6. 通用连通性测试脚本
+
+把下面的内容保存为项目根目录的 `scripts/test-supabase.mjs`，可对**任意表**做连通性与读写测试（只读测试不改动数据；写入测试默认跳过）：
+
+```js
+// 通用 Supabase 连通性测试：node scripts/test-supabase.mjs [表名] [--write]
+// 不传表名时只做连通性检查；--write 会对指定表插入一条测试数据再删除
+import "dotenv/config";
+import { createClient } from "@supabase/supabase-js";
+import { readFileSync, existsSync } from "node:fs";
+
+// 手动加载 .env.local（dotenv 默认只找 .env）
+if (existsSync(".env.local")) {
+  for (const line of readFileSync(".env.local", "utf-8").split("\n")) {
+    const m = line.match(/^\s*([A-Z_]+)\s*=\s*"?([^"\r\n]*)"?\s*$/);
+    if (m && !process.env[m[1]]) process.env[m[1]] = m[2];
+  }
+}
+
+const url = process.env.SUPABASE_URL;
+const key = process.env.SUPABASE_ANON_KEY;
+if (!url || !key) {
+  console.error("❌ 缺少 SUPABASE_URL / SUPABASE_ANON_KEY，请检查 .env.local");
+  process.exit(1);
+}
+
+const supabase = createClient(url, key);
+const table = process.argv[2];
+const doWrite = process.argv.includes("--write");
+
+// 1. 连通性：列一次所有表（head 请求只取数量，不拉数据）
+const probe = await supabase.from(table ?? "problems").select("*", { head: true, count: "exact" });
+if (probe.error) {
+  console.error(`❌ 连接失败: [${probe.error.code}] ${probe.error.message}`);
+  process.exit(1);
+}
+console.log(`✅ 连接成功${table ? `，表 ${table} 约有 ${probe.count} 行` : ""}`);
+
+// 2. 读取测试：取前 3 行看看字段结构
+if (table) {
+  const { data, error } = await supabase.from(table).select("*").limit(3);
+  if (error) {
+    console.error(`❌ 读取失败: ${error.message}`);
+    process.exit(1);
+  }
+  console.log("📄 前 3 行:", JSON.stringify(data, null, 2));
+
+  // 3. 写入测试（--write）：插一条最小记录再删掉，验证 RLS 是否放行写操作
+  if (doWrite) {
+    if (!data?.length) {
+      console.warn("⚠️ 表为空，无法参照现有行构造测试数据，跳过写入测试");
+      process.exit(0);
+    }
+    const sample = Object.fromEntries(
+      Object.entries(data[0]).filter(([, v]) => v !== null).slice(0, 2)
+    );
+    const { data: inserted, error: insertErr } = await supabase
+      .from(table)
+      .insert(sample)
+      .select()
+      .single();
+    if (insertErr) {
+      console.error(`❌ 写入失败（多为 RLS 拦截）: ${insertErr.message}`);
+      process.exit(1);
+    }
+    const idKey = Object.keys(sample)[0];
+    const { error: delErr } = await supabase.from(table).delete().eq(idKey, inserted[idKey]);
+    console.log(delErr ? `⚠️ 已插入但清理失败: ${delErr.message}` : "✅ 写入并清理成功，RLS 放行写操作");
+  }
+}
+```
+
+用法（在项目根目录执行）：
+
+```bash
+node scripts/test-supabase.mjs                  # 仅验证连通性（对 problems 表探活）
+node scripts/test-supabase.mjs problems         # 连通性 + 读前 3 行
+node scripts/test-supabase.mjs submissions --write   # 连通性 + 读 + 写入/删除测试
+```
+
+输出含义：连接失败多为 RLS/表名问题（对照第 7 节排查）；写入失败而读取成功，说明匿名身份只有读权限，属正常安全策略。
+
+## 7. 常见问题
 
 | 现象 | 原因 | 解决 |
 |---|---|---|
@@ -146,7 +228,7 @@ node -e "import('dotenv').then(d=>{d.config({path:'.env.local'});return import('
 | 改了 `.env.local` 不生效 | dev server 缓存了旧环境变量 | 重启 `npm run dev` |
 | `relation "xxx" does not exist` | 表名拼错 | 表名单复数敏感：`problems` 不是 `problem` |
 
-## 7. 安全提醒
+## 8. 安全提醒
 
 - 所有表当前由管理员统一管理权限策略；**不要**在代码里硬编码密钥，一律走 `.env.local` / 环境变量。
 - 若需要新表或修改表结构，请联系管理员在 Supabase 控制台操作，并同步更新本文件。
