@@ -42,6 +42,19 @@ export default function MeetingRoom({
   // 防止 React 严格模式下重复加入（重复 init 会浪费一个 token）
   const joinedRef = useRef(false);
 
+  /** @description 解除用户与指定房间的关联：主动退出（挂断 / 取消预览 /
+   *  离开页面 / 房间被关闭）时立即调用；异常退出（关浏览器等）来不及调用，
+   *  关联保留，靠下次进入会议页的重连弹窗兜底 */
+  const unbindRoom = useCallback((code: string | null) => {
+    if (!code) return;
+    // 带上 roomCode 条件解绑：另一标签页已切到新房间时不误删新关联
+    void fetch("/api/realtime/rooms/mine", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ roomCode: code }),
+    }).catch(() => null);
+  }, []);
+
   /** @description 用房间号或创建参数换 token 并初始化 meeting，成功后进入预览面板 */
   const join = useCallback(
     async (options?: { roomCode?: string; roomName?: string }) => {
@@ -92,7 +105,8 @@ export default function MeetingRoom({
   }, [initialRoomCode, join]);
 
   // 站内跳转（侧边栏 / 顶部导航 / 退出登录）前弹窗确认；
-  // 离开只是退出通话，房间保留：房主凭房间号可随时回来，关闭需在房间里显式操作
+  // 确认离开即主动退出：退出通话并解除本房间关联，房间保留
+  // （房主凭房间号可随时回来，关闭需在房间里显式操作）
   useEffect(() => {
     if (state.status !== "prejoin" && state.status !== "joined") return;
     const guard = async () => {
@@ -109,11 +123,13 @@ export default function MeetingRoom({
       });
       if (!confirmed) return false;
       if (state.status === "joined") await meeting.leave().catch(() => null);
+      // 跳转后组件卸载、roomLeft 监听可能来不及触发，这里直接解除关联
+      unbindRoom(roomCode);
       return true;
     };
     setLeaveGuard(guard);
     return () => clearLeaveGuard(guard);
-  }, [state.status, meeting, modal]);
+  }, [state.status, meeting, modal, roomCode, unbindRoom]);
 
   // 刷新 / 关闭标签页前弹浏览器确认框，防止误关丢会议；
   // 房间不会因离开被关闭（关闭是房主在房间内的显式操作）
@@ -138,8 +154,10 @@ export default function MeetingRoom({
   }, []);
 
   // 通话结束 / 主动挂断（含房主关闭、被踢出）后回到入口：清掉地址栏 room 参数，
-  // 避免刷新或复制链接时误重进；disconnected / connected-meeting 是 SDK 的断线
-  // 重连状态，不算离开，保持当前房间等待自动恢复
+  // 避免刷新或复制链接时误重进；并解除本房间关联（此后进会议页不再弹重连询问）。
+  // disconnected / connected-meeting 是 SDK 的断线重连状态，不算离开，
+  // 保持当前房间等待自动恢复；关浏览器等异常退出不会触发这里，
+  // 关联保留由重连弹窗兜底
   useEffect(() => {
     if (state.status !== "joined" || !meeting) return;
     const onRoomLeft = (payload: { state: string }) => {
@@ -149,13 +167,50 @@ export default function MeetingRoom({
       ) {
         return;
       }
+      unbindRoom(roomCode);
       resetToIdle();
     };
     meeting.self.on("roomLeft", onRoomLeft);
     return () => {
       meeting.self.removeListener("roomLeft", onRoomLeft);
     };
-  }, [state.status, meeting, resetToIdle]);
+  }, [state.status, meeting, roomCode, unbindRoom, resetToIdle]);
+
+  // 进入会议页（无房间号参数）时查询当前用户的关联房间：有进行中的房间就弹窗
+  // 询问「重新加入 / 解绑」——主动退出已在退出时解绑，弹窗主要兜底异常退出
+  // （关浏览器等来不及解绑的场景）。重新加入则沿用原关联；解绑只是删除关联指针，
+  // 房间本身保留（关闭仍是房主在房间内的显式操作）。邀请链接直达（?room=）
+  // 不询问：用户意图明确，由 token 接口自动切换关联
+  useEffect(() => {
+    if (initialRoomCode || state.status !== "idle") return;
+    let cancelled = false;
+    void (async () => {
+      const res = await fetch("/api/realtime/rooms/mine").catch(() => null);
+      if (!res?.ok || cancelled) return;
+      const data = (await res.json().catch(() => null)) as {
+        room?: { roomCode: string; roomName: string; isHost: boolean } | null;
+      } | null;
+      if (cancelled || !data?.room) return;
+      const { roomCode, roomName, isHost } = data.room;
+      modal.confirm({
+        title: "你有一个进行中的通话",
+        content: `${isHost ? "你创建的房间" : "你加入的房间"}「${roomName || "视频通话"}」（${roomCode}）仍在进行中，是否重新加入？`,
+        okText: "重新加入",
+        cancelText: "取消",
+        onOk: () => {
+          setState({ status: "joining" });
+          void join({ roomCode });
+        },
+        onCancel: () => {
+          // 用户选择不回去：按房间号条件解除关联，留在入口面板
+          unbindRoom(roomCode);
+        },
+      });
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [initialRoomCode, state.status, modal, join]);
 
   // 入口回调：创建 / 加入都走统一的 join 流程
   const handleCreate = useCallback(() => {
@@ -223,7 +278,11 @@ export default function MeetingRoom({
           isHost={isHost}
           onEnter={() => setState({ status: "joined" })}
           onRename={setRoomName}
-          onCancel={resetToIdle}
+          // 取消预览也是主动退出：token 已签发、关联已写入，这里解除
+          onCancel={() => {
+            unbindRoom(roomCode);
+            resetToIdle();
+          }}
         />
       ) : (
         <Room
