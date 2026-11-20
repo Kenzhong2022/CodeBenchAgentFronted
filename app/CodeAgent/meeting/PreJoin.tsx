@@ -14,7 +14,7 @@ import UnderlineInput from "@/components/UnderlineInput";
 
 /**
  * @description 进入前面板：自绘设备预览（摄像头画面 / 麦克风与摄像头开关 / 设备切换 / 昵称），
- *              房主可在此修改房间名称；媒体与改名等自身业务内聚在组件里，
+ *              房主可在此修改会议名称；媒体与改名等自身业务内聚在组件里，
  *              「进入 / 取消 / 改名成功」通过回调上抛给编排层（MeetingRoom）
  */
 export default function PreJoin({
@@ -36,6 +36,9 @@ export default function PreJoin({
   onCancel: () => void;
 }) {
   const { meeting } = useRealtimeKitMeeting();
+  /**
+   * @description 本地用户信息：包含视频 / 麦克风状态、昵称、设备列表等
+   */
   const self = meeting.self;
   const { message } = AntApp.useApp();
   const [videoEnabled, setVideoEnabled] = useState(self.videoEnabled);
@@ -55,25 +58,34 @@ export default function PreJoin({
   >({});
   const [joining, setJoining] = useState(false);
   const [error, setError] = useState("");
-  // 房间名称输入框：房主失焦 / 回车时保存，非房主只读
+  // 会议名称草稿：编辑过程仅本地可见，点「进入」时一次性提交，非房主只读
   const [roomNameDraft, setRoomNameDraft] = useState("");
   const [renaming, setRenaming] = useState(false);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   // RealtimeKit 的 enableVideo / enableAudio 不允许并发重入（在途再调会抛
   // ERR1100）：Strict Mode 双挂载与快速连点都会触发，这里按媒体类型记录
   // 在途调用去重
-  const mediaOpRef = useRef<{ video?: Promise<unknown>; audio?: Promise<unknown> }>({});
+  const mediaOpRef = useRef<{
+    video?: Promise<unknown>;
+    audio?: Promise<unknown>;
+  }>({});
+  /**
+   * @description 运行媒体操作：视频 / 麦克风开关
+   * @param mediaType 媒体类型（video / audio，对应登记表的一格）
+   * @param op 操作函数（如 enableVideo / enableAudio）
+   * @param onError 失败回调（如展示错误提示）
+   */
   const runMediaOp = useCallback(
     (
-      kind: "video" | "audio",
+      mediaType: "video" | "audio",
       op: () => Promise<unknown>,
       onError?: () => void,
     ) => {
-      if (mediaOpRef.current[kind]) return;
-      mediaOpRef.current[kind] = op()
+      if (mediaOpRef.current[mediaType]) return;
+      mediaOpRef.current[mediaType] = op()
         .catch(() => onError?.())
         .finally(() => {
-          mediaOpRef.current[kind] = undefined;
+          mediaOpRef.current[mediaType] = undefined;
         });
     },
     [],
@@ -126,19 +138,52 @@ export default function PreJoin({
     };
   }, [self, runMediaOp]);
 
-  // 确认进入：昵称 + 加入；加入成功后由编排层切到通话界面
+  /*
+   * 房主提交会议名称：编辑阶段不调接口，「进入」时统一调用一次；
+   * 未修改 / 清空则跳过。成功上抛编排层（分享文案 / 通话顶栏），
+   * 失败返回 false，由 enterMeeting 展示错误并阻断进入
+   */
+  const saveRoomName = useCallback(async (): Promise<boolean> => {
+    const next = roomNameDraft.trim().slice(0, 40);
+    if (!isHost || !next || next === roomName || !roomCode) return true;
+    setRenaming(true);
+    try {
+      const res = await fetch(`/api/realtime/rooms/${roomCode}/rename`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: next }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(data?.error ?? "修改会议名称失败");
+      onRename(next);
+      return true;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "修改会议名称失败");
+      return false;
+    } finally {
+      setRenaming(false);
+    }
+  }, [isHost, onRename, roomCode, roomName, roomNameDraft]);
+
+  // 确认进入：昵称与会议名称各提交一次，加入成功后由编排层切到通话界面
   const enterMeeting = useCallback(async () => {
     setJoining(true);
     setError("");
     try {
       if (canEditName && displayName.trim()) self.setName(displayName.trim());
+      // 会议名称在进入前提交，失败则不进入、在错误区展示原因
+      const renamed = await saveRoomName();
+      if (!renamed) {
+        setJoining(false);
+        return;
+      }
       await meeting.join();
       onEnter();
     } catch (err) {
       setError(err instanceof Error ? err.message : "进入通话失败");
       setJoining(false);
     }
-  }, [canEditName, displayName, meeting, onEnter, self]);
+  }, [canEditName, displayName, meeting, onEnter, saveRoomName, self]);
 
   const toggleVideo = useCallback(() => {
     runMediaOp(
@@ -173,34 +218,11 @@ export default function PreJoin({
     [devices, message, self],
   );
 
-  const deviceOptions = (list: MediaDeviceInfo[], kindLabel: string) =>
+  const deviceOptions = (list: MediaDeviceInfo[], typeLabel: string) =>
     list.map((device, index) => ({
       value: device.deviceId,
-      label: device.label || `${kindLabel} ${index + 1}`,
+      label: device.label || `${typeLabel} ${index + 1}`,
     }));
-
-  // 房主保存房间名称：失焦 / 回车触发，成功后上抛给编排层（分享文案 / 通话顶栏）
-  const saveRoomName = useCallback(async () => {
-    const next = roomNameDraft.trim().slice(0, 40);
-    if (!next || next === roomName || !roomCode) return;
-    setRenaming(true);
-    try {
-      const res = await fetch(`/api/realtime/rooms/${roomCode}/rename`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: next }),
-      });
-      const data = await res.json().catch(() => null);
-      if (!res.ok) throw new Error(data?.error ?? "修改房间名称失败");
-      onRename(next);
-      message.success("房间名称已更新");
-    } catch (err) {
-      message.error(err instanceof Error ? err.message : "修改房间名称失败");
-      setRoomNameDraft(roomName);
-    } finally {
-      setRenaming(false);
-    }
-  }, [message, onRename, roomCode, roomName, roomNameDraft]);
 
   return (
     <div className="flex h-full items-center justify-center overflow-auto p-4">
@@ -276,26 +298,25 @@ export default function PreJoin({
           />
         </div>
 
-        {/* 右侧：房间信息 + 昵称 + 进入按钮 */}
+        {/* 右侧：会议信息 + 昵称 + 进入按钮 */}
         <div className="flex flex-col justify-center gap-4">
           <div>
-            {/* 会议名称：点击即改，失焦 / 回车保存；空时占位显示默认会议名称 */}
+            {/* 会议名称：点击即改，进入会议时统一提交；空时占位显示默认会议名称 */}
             <UnderlineInput
               disabled={!isHost || renaming}
               maxLength={40}
               value={roomNameDraft}
               placeholder={roomName || "视频通话"}
               onChange={(e) => setRoomNameDraft(e.target.value)}
-              onBlur={() => void saveRoomName()}
               onPressEnter={(e) => e.currentTarget.blur()}
             />
             <div className="mt-1 text-xs text-(--ant-color-text-secondary)">
-              房间号：
+              会议号：
               <code>{roomCode ? formatRoomCode(roomCode) : ""}</code>
             </div>
             {isHost && (
               <div className="mt-1 text-xs text-(--ant-color-text-tertiary)">
-                点击名称可修改，失焦或回车保存；清空则保持默认名称
+                点击名称可修改，进入会议时提交；清空则保持默认名称
               </div>
             )}
           </div>
