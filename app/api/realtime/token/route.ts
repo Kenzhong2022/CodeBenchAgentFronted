@@ -12,9 +12,9 @@ import {
 } from "@/lib/room-code";
 
 /**
- * @description 1v1 通话房间的令牌签发：浏览器 → 本路由 → Cloudflare RealtimeKit REST。
+ * @description 1v1 通话会议的令牌签发：浏览器 → 本路由 → Cloudflare RealtimeKit REST。
  *   API Token 只保存在服务端（Worker secret），浏览器只拿到短期的 participant token。
- *   请求体可带 9 位短房间号：带上则加入已有房间，不带则先创建会议再加入。
+ *   请求体可带 9 位短会议号：带上则加入已有会议，不带则先创建会议再加入。
  */
 
 type RtkResult<T> = {
@@ -61,11 +61,11 @@ async function rtkPost<T>(
 }
 
 /**
- * @description 一个用户同一时间只能关联一个房间：进入新房间前释放旧关联。
- *              只解除关联不关闭房间——房间关闭是房主的显式操作（房间内「关闭房间」按钮），
- *              临时切换后凭房间号仍可回到自己的房间；无主房间随短号 TTL 过期回收
+ * @description 一个用户同一时间只能关联一个会议：进入新会议前释放旧关联。
+ *              只解除关联不关闭会议——会议关闭是房主的显式操作（会议内「关闭会议」按钮），
+ *              临时切换后凭会议号仍可回到自己的会议；无主会议随短号 TTL 过期回收
  * @param userId 当前用户 ID
- * @param nextRoomCode 即将进入的房间号，与旧关联相同时不做处理
+ * @param nextRoomCode 即将进入的会议号，与旧关联相同时不做处理
  */
 async function releasePreviousRoom(
   userId: string,
@@ -77,14 +77,14 @@ async function releasePreviousRoom(
 }
 
 /**
- * @description 处理 POST 请求，返回 1v1 通话房间的令牌。
+ * @description 处理 POST 请求，返回 1v1 通话会议的令牌。
  * @param request 包含 roomCode（加入）或 roomName（创建）的 JSON 请求体
  * @returns 包含 meetingId、roomCode、roomName、isHost 和 authToken 的 JSON 响应
  * @throws 503 通话服务或短号服务未配置
  * @throws 401 未登录
- * @throws 400 房间号格式错误
- * @throws 404 房间号不存在或已过期
- * @throws 410 房间已关闭
+ * @throws 400 会议号格式错误
+ * @throws 404 会议号不存在或已过期
+ * @throws 410 会议已关闭
  */
 export async function POST(request: Request): Promise<NextResponse> {
   // Worker 运行时模块加载阶段读不到请求级环境变量，必须在请求内读取
@@ -95,7 +95,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     return NextResponse.json({ error: "通话服务未配置" }, { status: 503 });
   }
 
-  // 用现有 HttpOnly 会话向 Python 端确认身份，未登录不允许创建 / 加入房间
+  // 用现有 HttpOnly 会话向 Python 端确认身份，未登录不允许创建 / 加入会议
   const cookie = request.headers.get("cookie");
   const me = await callPython("/api/auth/me", {
     headers: cookie ? { cookie } : {},
@@ -114,14 +114,14 @@ export async function POST(request: Request): Promise<NextResponse> {
   } | null;
   const requestedRoomCode =
     typeof payload?.roomCode === "string" ? payload.roomCode.trim() : undefined;
-  // 创建房间时可自定义名称；不传或为空时使用「用户名 + 视频会议」
+  // 创建会议时可自定义名称；不传或为空时使用「用户名 + 视频会议」
   const requestedRoomName =
     typeof payload?.roomName === "string"
       ? payload.roomName.trim().slice(0, 40)
       : "";
 
   if (requestedRoomCode && !isValidRoomCode(requestedRoomCode)) {
-    return NextResponse.json({ error: "房间号无效" }, { status: 400 });
+    return NextResponse.json({ error: "会议号无效" }, { status: 400 });
   }
 
   try {
@@ -132,18 +132,18 @@ export async function POST(request: Request): Promise<NextResponse> {
     let presetName: string;
 
     if (requestedRoomCode) {
-      // 短号换回房间记录；关闭 / 过期时不再签发 token
+      // 短号换回会议记录；关闭 / 过期时不再签发 token
       const room = await getRoom(requestedRoomCode);
       if (!room) {
         return NextResponse.json(
-          { error: "房间号不存在或已过期" },
+          { error: "会议号不存在或已过期" },
           { status: 404 },
         );
       }
       if (room.status === "closed") {
-        return NextResponse.json({ error: "房间已关闭" }, { status: 410 });
+        return NextResponse.json({ error: "会议已关闭" }, { status: 410 });
       }
-      // 房主判定规则：RoomRecord.ownerId 是创建房间时固化的创建者 user.id（见
+      // 房主判定规则：RoomRecord.ownerId 是创建会议时固化的创建者 user.id（见
       // lib/room-code.ts），此处比对当前用户——相等即房主（含房主断线重进），
       // 不等即参与者；前端 UI 与 close / rename 接口都以此身份为准
       isHost = Boolean(room.ownerId) && room.ownerId === user.id;
@@ -211,12 +211,12 @@ export async function POST(request: Request): Promise<NextResponse> {
       },
     );
 
-    // 一个用户只关联一个房间。关联的解除方式分两类：
-    // ① 不带房间号进入会议页时，前端弹窗由用户选择「重新加入 / 不加入并解绑」，
-    //    解绑走 DELETE /api/realtime/rooms/mine（只删指针不关房间）；
-    // ② 邀请链接直达加入（意图明确，无需询问）：此处自动把关联切到新房间，
-    //    同房间重入时 releasePreviousRoom 自动跳过。两种情况都只动关联指针，
-    //    房间关闭仍是房主在房间内的显式操作
+    // 一个用户只关联一个会议。关联的解除方式分两类：
+    // ① 不带会议号进入会议页时，前端弹窗由用户选择「重新加入 / 不加入并解绑」，
+    //    解绑走 DELETE /api/realtime/rooms/mine（只删指针不关会议）；
+    // ② 邀请链接直达加入（意图明确，无需询问）：此处自动把关联切到新会议，
+    //    同会议重入时 releasePreviousRoom 自动跳过。两种情况都只动关联指针，
+    //    会议关闭仍是房主在会议内的显式操作
     await releasePreviousRoom(user.id, roomCode);
     await setUserRoom(user.id, roomCode);
 

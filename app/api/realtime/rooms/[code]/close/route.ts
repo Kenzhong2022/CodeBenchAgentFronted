@@ -7,11 +7,11 @@ import {
 } from "@/lib/room-code";
 
 /**
- * @description 房主关闭房间：关闭后该短号不再签发 token。
+ * @description 房主关闭会议：关闭后该短号不再签发 token。
  * @throws 503 短号服务未配置
  * @throws 401 未登录
- * @throws 400 房间号格式错误
- * @throws 404 房间号不存在或已过期
+ * @throws 400 会议号格式错误
+ * @throws 404 会议号不存在或已过期
  * @throws 403 非房主
  */
 export async function POST(
@@ -20,7 +20,7 @@ export async function POST(
 ): Promise<NextResponse> {
   const { code } = await ctx.params;
   if (!isValidRoomCode(code)) {
-    return NextResponse.json({ error: "房间号无效" }, { status: 400 });
+    return NextResponse.json({ error: "会议号无效" }, { status: 400 });
   }
   if (!isCodeStoreConfigured()) {
     return NextResponse.json({ error: "短号服务未配置" }, { status: 503 });
@@ -41,13 +41,13 @@ export async function POST(
   const result = await closeRoom(code, user.id);
   if (result === "not-found") {
     return NextResponse.json(
-      { error: "房间号不存在或已过期" },
+      { error: "会议号不存在或已过期" },
       { status: 404 },
     );
   }
   if (result === "forbidden") {
     return NextResponse.json(
-      { error: "只有房主可以关闭房间" },
+      { error: "只有房主可以关闭会议" },
       { status: 403 },
     );
   }

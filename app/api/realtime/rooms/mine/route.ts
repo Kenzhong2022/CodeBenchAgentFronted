@@ -3,12 +3,12 @@ import { callPython } from "@/lib/pythonApi";
 import { clearUserRoom, getRoom, getUserRoom, isValidRoomCode } from "@/lib/room-code";
 
 /**
- * @description 当前登录用户的房间关联（rtk:user:{userId}）：
- *   GET 查询是否有进行中的关联房间（进入会议页时弹窗询问是否重新加入，
+ * @description 当前登录用户的会议关联（rtk:user:{userId}）：
+ *   GET 查询是否有进行中的关联会议（进入会议页时弹窗询问是否重新加入，
  *   主要兜底异常退出——关浏览器等场景来不及解绑）；
  *   DELETE 解除绑定：主动退出（挂断 / 取消预览 / 离开页面）时由前端立即调用，
- *   用户在重连弹窗选「不回去」时也走这里。房间本身不受影响——
- *   关闭仍是房主在房间内的显式操作，解绑后的无主房间随短号 TTL 过期回收
+ *   用户在重连弹窗选「不回去」时也走这里。会议本身不受影响——
+ *   关闭仍是房主在会议内的显式操作，解绑后的无主会议随短号 TTL 过期回收
  */
 
 /** @description 转发 Cookie 校验登录态，返回当前用户或 null */
@@ -32,7 +32,7 @@ export async function GET(request: Request): Promise<NextResponse> {
   if (!code) return NextResponse.json({ room: null });
 
   const room = await getRoom(code);
-  // 关联的房间已过期 / 已关闭：指针失效，顺手清理，不再打扰用户
+  // 关联的会议已过期 / 已关闭：指针失效，顺手清理，不再打扰用户
   if (!room || room.status === "closed") {
     await clearUserRoom(user.id, code);
     return NextResponse.json({ room: null });
@@ -54,8 +54,8 @@ export async function DELETE(request: Request): Promise<NextResponse> {
   if (!user?.id) {
     return NextResponse.json({ error: "请先登录" }, { status: 401 });
   }
-  // 可选 roomCode：带上时只在当前关联正好指向该房间时清除，
-  // 避免并发场景（如另一标签页已切到新房间）误删新关联
+  // 可选 roomCode：带上时只在当前关联正好指向该会议时清除，
+  // 避免并发场景（如另一标签页已切到新会议）误删新关联
   const body = (await request.json().catch(() => null)) as {
     roomCode?: string;
   } | null;

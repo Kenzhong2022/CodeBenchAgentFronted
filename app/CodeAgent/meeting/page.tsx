@@ -18,7 +18,7 @@ const MeetingRoom = dynamic(() => import("./MeetingRoom"), {
 /**
  * @description 1v1 视频 / 语音会议页：useSearchParams 必须在 Suspense 边界内的
  *              子组件中调用，否则预渲染阶段会 CSR bailout 导致构建失败；
- *              房间号由 MeetingRoom 写入地址栏以便分享
+ *              会议号由 MeetingRoom 写入地址栏以便分享
  */
 function RoomFromQuery() {
   return <MeetingRoom roomCode={useSearchParams().get("room")} />;

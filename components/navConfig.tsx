@@ -110,7 +110,7 @@ export const NAV_GROUPS: NavGroup[] = [
       {
         key: "/CodeAgent/meeting",
         label: "视频通话",
-        description: "创建 1v1 视频 / 语音通话房间并邀请对方",
+        description: "创建 1v1 视频 / 语音通话会议并邀请对方",
         icon: <VideoCameraOutlined />,
       },
     ],

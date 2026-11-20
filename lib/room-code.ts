@@ -1,24 +1,24 @@
 /**
- * @description 短房间号：9 位数字 → 房间元数据（会议 UUID / 房主 / 状态），存于 Upstash Redis。
+ * @description 短会议号：9 位数字 → 会议元数据（会议 UUID / 房主 / 状态），存于 Upstash Redis。
  *              短号仅用于展示和分享，加入时由服务端换回真实会议号。
  */
 
 const ROOM_CODE_PREFIX = "rtk:room:";
-/** 用户当前关联的房间：一个用户同一时间只能关联一个房间 */
+/** 用户当前关联的会议：一个用户同一时间只能关联一个会议 */
 const USER_ROOM_PREFIX = "rtk:user:";
-/** 短号有效期 30 天，过期后房间号不可再加入 */
+/** 短号有效期 30 天，过期后会议号不可再加入 */
 const ROOM_CODE_TTL_SECONDS = 60 * 60 * 24 * 30;
 
-/** @description 房间元数据；status 为 closed 时不再签发 token */
+/** @description 会议元数据；status 为 closed 时不再签发 token */
 export type RoomRecord = {
   meetingId: string;
   /**
-   * 房主规则：创建房间时固化为创建者的 user.id，此后不再变更（无房主转让逻辑），
-   * 直到房间关闭或 30 天 TTL 过期。close / rename 接口据此校验身份（非房主 403），
+   * 房主规则：创建会议时固化为创建者的 user.id，此后不再变更（无房主转让逻辑），
+   * 直到会议关闭或 30 天 TTL 过期。close / rename 接口据此校验身份（非房主 403），
    * 签发 token 时与之比对决定 isHost（房主用 host 预设，其他人用 participant 预设）
    */
   ownerId: string | null;
-  /** 房间名称：创建时由房主填写，默认「用户名 + 视频会议」 */
+  /** 会议名称：创建时由房主填写，默认「用户名 + 视频会议」 */
   name: string;
   status: "open" | "closed";
   createdAt: number;
@@ -32,14 +32,14 @@ export function isCodeStoreConfigured(): boolean {
   );
 }
 
-/** @description 生成 9 位数字房间号，形如 656350569 */
+/** @description 生成 9 位数字会议号，形如 656350569 */
 export function generateRoomCode(): string {
   const buf = new Uint32Array(1);
   crypto.getRandomValues(buf);
   return String(100_000_000 + (buf[0] % 900_000_000));
 }
 
-/** @description 校验是否为合法的 9 位数字房间号 */
+/** @description 校验是否为合法的 9 位数字会议号 */
 export function isValidRoomCode(value: string): boolean {
   return /^\d{9}$/.test(value);
 }
@@ -72,7 +72,7 @@ async function redisCommand(command: (string | number)[]): Promise<unknown> {
   return json?.result ?? null;
 }
 
-/** @description 写入房间记录；短号已存在时返回 false（用于撞号重试） */
+/** @description 写入会议记录；短号已存在时返回 false（用于撞号重试） */
 async function saveRoom(
   code: string,
   record: RoomRecord,
@@ -106,10 +106,10 @@ export async function createRoomCode(
     const code = generateRoomCode();
     if (await saveRoom(code, record, true)) return code;
   }
-  throw new Error("无法分配房间号");
+  throw new Error("无法分配会议号");
 }
 
-/** @description 读取房间记录；短号不存在或已过期返回 null */
+/** @description 读取会议记录；短号不存在或已过期返回 null */
 export async function getRoom(code: string): Promise<RoomRecord | null> {
   const value = await redisCommand(["GET", `${ROOM_CODE_PREFIX}${code}`]);
   if (typeof value !== "string") return null;
@@ -128,13 +128,13 @@ export async function getRoom(code: string): Promise<RoomRecord | null> {
   }
 }
 
-/** @description 读取用户当前关联的房间号；没有关联或格式非法返回 null */
+/** @description 读取用户当前关联的会议号；没有关联或格式非法返回 null */
 export async function getUserRoom(userId: string): Promise<string | null> {
   const value = await redisCommand(["GET", `${USER_ROOM_PREFIX}${userId}`]);
   return typeof value === "string" && isValidRoomCode(value) ? value : null;
 }
 
-/** @description 记录用户当前关联的房间，保证一个用户最多只关联一个房间 */
+/** @description 记录用户当前关联的会议，保证一个用户最多只关联一个会议 */
 export async function setUserRoom(userId: string, code: string): Promise<void> {
   await redisCommand([
     "SET",
@@ -146,8 +146,8 @@ export async function setUserRoom(userId: string, code: string): Promise<void> {
 }
 
 /**
- * @description 清除用户房间关联；传入 code 时只在当前关联正好是该房间时清除，
- *              避免并发切换房间时误删新关联
+ * @description 清除用户会议关联；传入 code 时只在当前关联正好是该会议时清除，
+ *              避免并发切换会议时误删新关联
  */
 export async function clearUserRoom(
   userId: string,
@@ -157,7 +157,7 @@ export async function clearUserRoom(
   await redisCommand(["DEL", `${USER_ROOM_PREFIX}${userId}`]);
 }
 
-/** @description 房主关闭房间：保留记录（便于提示「房间已关闭」），但不再允许加入 */
+/** @description 房主关闭会议：保留记录（便于提示「会议已关闭」），但不再允许加入 */
 export async function closeRoom(
   code: string,
   ownerId: string,
@@ -167,12 +167,12 @@ export async function closeRoom(
   if (room.ownerId && room.ownerId !== ownerId) return "forbidden";
 
   await saveRoom(code, { ...room, status: "closed" }, false);
-  // 房间关闭后房主不再关联该房间，可以创建 / 加入下一个房间
+  // 会议关闭后房主不再关联该会议，可以创建 / 加入下一个会议
   if (room.ownerId) await clearUserRoom(room.ownerId, code);
   return "ok";
 }
 
-/** @description 房主修改房间名称；分享文案与进入面板展示同步更新 */
+/** @description 房主修改会议名称；分享文案与进入面板展示同步更新 */
 export async function renameRoom(
   code: string,
   ownerId: string,

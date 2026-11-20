@@ -9,8 +9,8 @@ import { formatRoomCode } from "@/lib/room-code";
 import { zhCN } from "./zh-CN";
 
 /**
- * @description 房间主体：顶部房间名称 / 房间号 / 房主操作 / 分享入口 + 官方 Meeting UI。
- *              语言切换、分享、关闭房间等业务内聚在组件里，关闭成功后回调编排层回入口
+ * @description 会议主体：顶部会议名称 / 会议号 / 房主操作 / 分享入口 + 官方 Meeting UI。
+ *              语言切换、分享、关闭会议等业务内聚在组件里，关闭成功后回调编排层回入口
  */
 export default function Room({
   roomCode,
@@ -21,7 +21,7 @@ export default function Room({
   roomCode: string | null;
   roomName: string;
   isHost: boolean;
-  /** @description 房主关闭房间成功后通知编排层重置回入口 */
+  /** @description 房主关闭会议成功后通知编排层重置回入口 */
   onClosed: () => void;
 }) {
   const { meeting } = useRealtimeKitMeeting();
@@ -53,7 +53,7 @@ export default function Room({
     }
   }, [inviteText, message]);
 
-  // 房主关闭房间：先让服务端置为 closed，避免其他人再拿 token，然后主动离开
+  // 房主关闭会议：先让服务端置为 closed，避免其他人再拿 token，然后主动离开
   const closeRoom = useCallback(async () => {
     if (!roomCode) return;
     setClosing(true);
@@ -62,12 +62,12 @@ export default function Room({
         method: "POST",
       });
       const data = await res.json().catch(() => null);
-      if (!res.ok) throw new Error(data?.error ?? "关闭房间失败");
+      if (!res.ok) throw new Error(data?.error ?? "关闭会议失败");
       await meeting.leave();
-      message.success("房间已关闭");
+      message.success("会议已关闭");
       onClosed();
     } catch (err) {
-      message.error(err instanceof Error ? err.message : "关闭房间失败");
+      message.error(err instanceof Error ? err.message : "关闭会议失败");
     } finally {
       setClosing(false);
     }
@@ -81,7 +81,7 @@ export default function Room({
             {roomName || "视频通话"}
           </span>
           <span className="shrink-0">
-            房间号：<code className="text-(--ant-color-text)">{displayCode}</code>
+            会议号：<code className="text-(--ant-color-text)">{displayCode}</code>
           </span>
           {isHost && (
             <Tag color="gold" className="shrink-0">
@@ -105,14 +105,14 @@ export default function Room({
           </Button>
           {isHost && (
             <Popconfirm
-              title="关闭房间？"
+              title="关闭会议？"
               description="关闭后其他人将无法再加入"
-              okText="关闭房间"
+              okText="关闭会议"
               cancelText="取消"
               onConfirm={closeRoom}
             >
               <Button size="small" danger loading={closing}>
-                关闭房间
+                关闭会议
               </Button>
             </Popconfirm>
           )}
