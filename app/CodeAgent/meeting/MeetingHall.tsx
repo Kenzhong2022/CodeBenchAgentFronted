@@ -6,10 +6,11 @@ import { VideoCameraOutlined, PlusOutlined } from "@ant-design/icons";
 import { isValidRoomCode } from "@/lib/room-code";
 
 /**
- * @description 通话空闲入口：创建 / 加入两张卡片 + 加入房间号弹窗，纯展示层，
- *              创建与加入动作通过回调上抛给编排层（MeetingRoom）
+ * @description 会议大厅：会议模块的入口聚合页——当前提供「创建房间 / 加入房间」
+ *              两个动作（纯展示层，动作通过回调上抛给编排层 MeetingRoom），
+ *              未来历史记录、快速会议等入口功能也归这里扩展
  */
-export default function EntryPanel({
+export default function MeetingHall({
   onCreate,
   onJoin,
 }: {

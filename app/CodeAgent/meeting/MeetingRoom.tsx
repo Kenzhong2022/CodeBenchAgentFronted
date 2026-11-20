@@ -6,10 +6,11 @@ import { ReloadOutlined } from "@ant-design/icons";
 import {
   RealtimeKitProvider,
   useRealtimeKitClient,
+  type LeaveRoomState,
 } from "@cloudflare/realtimekit-react";
 import { isValidRoomCode } from "@/lib/room-code";
 import { clearLeaveGuard, setLeaveGuard } from "@/lib/leave-guard";
-import EntryPanel from "./EntryPanel";
+import MeetingHall from "./MeetingHall";
 import PreJoin from "./PreJoin";
 import Room from "./Room";
 
@@ -23,7 +24,7 @@ type JoinState =
 /**
  * @description 会议流程编排层：管理空闲 → 接入中 → 进入前面板 → 通话中 → 出错 的状态机，
  *              负责换 token、初始化 RealtimeKit 与离开守卫；界面全部委托给
- *              EntryPanel / PreJoin / Room 三个展示组件
+ *              MeetingHall / PreJoin / Room 三个展示组件
  * @param roomCode 9 位短房间号；null 表示展示创建入口
  */
 export default function MeetingRoom({
@@ -43,16 +44,20 @@ export default function MeetingRoom({
   const joinedRef = useRef(false);
 
   /** @description 解除用户与指定房间的关联：主动退出（挂断 / 取消预览 /
-   *  离开页面 / 房间被关闭）时立即调用；异常退出（关浏览器等）来不及调用，
-   *  关联保留，靠下次进入会议页的重连弹窗兜底 */
-  const unbindRoom = useCallback((code: string | null) => {
-    if (!code) return;
+   *  离开页面 / 房间被关闭）时调用；异常退出（关浏览器等）来不及调用，
+   *  关联保留，靠下次进入会议页的重连弹窗兜底。
+   *  返回 Promise 供退出流程等待：解绑落地后再回入口，否则入口的
+   *  「查询关联房间」可能在 DELETE 在途时读到旧指针，误弹重连询问 */
+  const unbindRoom = useCallback((code: string | null): Promise<void> => {
+    if (!code) return Promise.resolve();
     // 带上 roomCode 条件解绑：另一标签页已切到新房间时不误删新关联
-    void fetch("/api/realtime/rooms/mine", {
+    return fetch("/api/realtime/rooms/mine", {
       method: "DELETE",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ roomCode: code }),
-    }).catch(() => null);
+    })
+      .then(() => undefined)
+      .catch(() => undefined);
   }, []);
 
   /** @description 用房间号或创建参数换 token 并初始化 meeting，成功后进入预览面板 */
@@ -96,17 +101,21 @@ export default function MeetingRoom({
     [initMeeting],
   );
 
-  // 从邀请链接进入：URL 已带房间号，直接加入。
-  // 这里是在同步外部系统（换取 token 并初始化 RealtimeKit / 摄像头），
-  // setState 都发生在 await 之后，不会产生同步级联渲染
+  /*
+   * 从邀请链接进入：URL 已带房间号，直接加入。
+   * 这里是在同步外部系统（换取 token 并初始化 RealtimeKit / 摄像头），
+   * setState 都发生在 await 之后，不会产生同步级联渲染
+   */
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     if (initialRoomCode) void join({ roomCode: initialRoomCode });
   }, [initialRoomCode, join]);
 
-  // 站内跳转（侧边栏 / 顶部导航 / 退出登录）前弹窗确认；
-  // 确认离开即主动退出：退出通话并解除本房间关联，房间保留
-  // （房主凭房间号可随时回来，关闭需在房间里显式操作）
+  /*
+   * 站内跳转（侧边栏 / 顶部导航 / 退出登录）前弹窗确认；
+   * 确认离开即主动退出：退出通话并解除本房间关联，房间保留
+   * （房主凭房间号可随时回来，关闭需在房间里显式操作）
+   */
   useEffect(() => {
     if (state.status !== "prejoin" && state.status !== "joined") return;
     const guard = async () => {
@@ -123,16 +132,19 @@ export default function MeetingRoom({
       });
       if (!confirmed) return false;
       if (state.status === "joined") await meeting.leave().catch(() => null);
-      // 跳转后组件卸载、roomLeft 监听可能来不及触发，这里直接解除关联
-      unbindRoom(roomCode);
+      // 跳转后组件卸载、roomLeft 监听可能来不及触发，这里直接解除关联；
+      // 等待解绑落地再放行跳转，避免回到会议页时关联查询读到旧指针
+      await unbindRoom(roomCode);
       return true;
     };
     setLeaveGuard(guard);
     return () => clearLeaveGuard(guard);
   }, [state.status, meeting, modal, roomCode, unbindRoom]);
 
-  // 刷新 / 关闭标签页前弹浏览器确认框，防止误关丢会议；
-  // 房间不会因离开被关闭（关闭是房主在房间内的显式操作）
+  /*
+   * 刷新 / 关闭标签页前弹浏览器确认框，防止误关丢会议；
+   * 房间不会因离开被关闭（关闭是房主在房间内的显式操作）
+   */
   useEffect(() => {
     if (state.status !== "prejoin" && state.status !== "joined") return;
     const onBeforeUnload = (event: BeforeUnloadEvent) => {
@@ -153,34 +165,60 @@ export default function MeetingRoom({
     window.history.replaceState(null, "", "/CodeAgent/meeting");
   }, []);
 
-  // 通话结束 / 主动挂断（含房主关闭、被踢出）后回到入口：清掉地址栏 room 参数，
-  // 避免刷新或复制链接时误重进；并解除本房间关联（此后进会议页不再弹重连询问）。
-  // disconnected / connected-meeting 是 SDK 的断线重连状态，不算离开，
-  // 保持当前房间等待自动恢复；关浏览器等异常退出不会触发这里，
-  // 关联保留由重连弹窗兜底
+  /*
+   * roomLeft 事件的 state 语义（LeaveRoomState，由 @cloudflare/realtimekit-react
+   * 从 @cloudflare/realtimekit 转发导出）：
+   * - left：自己主动离开（官方 UI 的「离开」按钮 / 站内跳转前的 meeting.leave）
+   * - ended：会议被结束——房主在官方 UI 点「为所有人结束会议」或被 kickAll，
+   *          房主与所有参与者都会收到此状态
+   * - kicked：被房主单独移出会议
+   * - rejected：申请发言（waitlist）被拒绝
+   * - stageLeft：主动下台（livestream 场景）
+   * - failed：房间节点故障且 SDK 重连耗尽，需重新加入
+   * - disconnected / connected-meeting：断线与重连中，SDK 会自动恢复，不算离开
+   * 除 disconnected / connected-meeting 外都视为「本次通话已退出」：
+   * 解除房间关联并回到入口。被动退出（ended / kicked）弹窗告知原因，
+   * 自己主动离开（left）无需提示。关浏览器等异常退出不会触发 roomLeft，
+   * 关联保留由进入会议页时的重连弹窗兜底
+   */
   useEffect(() => {
     if (state.status !== "joined" || !meeting) return;
-    const onRoomLeft = (payload: { state: string }) => {
+    const onRoomLeft = (payload: { state: LeaveRoomState }) => {
       if (
         payload.state === "connected-meeting" ||
         payload.state === "disconnected"
       ) {
         return;
       }
-      unbindRoom(roomCode);
-      resetToIdle();
+      if (payload.state === "ended") {
+        modal.info({
+          title: "会议已结束",
+          content: isHost ? "你已为所有人结束本次通话" : "房主已结束本次通话",
+        });
+      } else if (payload.state === "kicked") {
+        modal.warning({ title: "你已被移出会议" });
+      }
+      /*
+       * 解绑落地后再回入口：入口 effect 会立刻查询关联房间，
+       * DELETE 在途时会被查询到、误弹「是否重新加入」
+       */
+      void unbindRoom(roomCode).then(() => {
+        resetToIdle();
+      });
     };
     meeting.self.on("roomLeft", onRoomLeft);
     return () => {
       meeting.self.removeListener("roomLeft", onRoomLeft);
     };
-  }, [state.status, meeting, roomCode, unbindRoom, resetToIdle]);
+  }, [state.status, meeting, roomCode, isHost, modal, unbindRoom, resetToIdle]);
 
-  // 进入会议页（无房间号参数）时查询当前用户的关联房间：有进行中的房间就弹窗
-  // 询问「重新加入 / 解绑」——主动退出已在退出时解绑，弹窗主要兜底异常退出
-  // （关浏览器等来不及解绑的场景）。重新加入则沿用原关联；解绑只是删除关联指针，
-  // 房间本身保留（关闭仍是房主在房间内的显式操作）。邀请链接直达（?room=）
-  // 不询问：用户意图明确，由 token 接口自动切换关联
+  /*
+   * 进入会议页（无房间号参数）时查询当前用户的关联房间：有进行中的房间就弹窗
+   * 询问「重新加入 / 解绑」——主动退出已在退出时解绑，弹窗主要兜底异常退出
+   * （关浏览器等来不及解绑的场景）。重新加入则沿用原关联；解绑只是删除关联指针，
+   * 房间本身保留（关闭仍是房主在房间内的显式操作）。邀请链接直达（?room=）
+   * 不询问：用户意图明确，由 token 接口自动切换关联
+   */
   useEffect(() => {
     if (initialRoomCode || state.status !== "idle") return;
     let cancelled = false;
@@ -210,7 +248,7 @@ export default function MeetingRoom({
     return () => {
       cancelled = true;
     };
-  }, [initialRoomCode, state.status, modal, join]);
+  }, [initialRoomCode, state.status, modal, join, unbindRoom]);
 
   // 入口回调：创建 / 加入都走统一的 join 流程
   const handleCreate = useCallback(() => {
@@ -229,7 +267,7 @@ export default function MeetingRoom({
   );
 
   if (state.status === "idle") {
-    return <EntryPanel onCreate={handleCreate} onJoin={handleJoin} />;
+    return <MeetingHall onCreate={handleCreate} onJoin={handleJoin} />;
   }
 
   if (state.status === "error") {
@@ -278,10 +316,14 @@ export default function MeetingRoom({
           isHost={isHost}
           onEnter={() => setState({ status: "joined" })}
           onRename={setRoomName}
-          // 取消预览也是主动退出：token 已签发、关联已写入，这里解除
+          /*
+           * 取消预览也是主动退出：token 已签发、关联已写入，这里解除；
+           * 等解绑落地再回入口，避免入口关联查询读到旧指针误弹重连询问
+           */
           onCancel={() => {
-            unbindRoom(roomCode);
-            resetToIdle();
+            void unbindRoom(roomCode).then(() => {
+              resetToIdle();
+            });
           }}
         />
       ) : (
