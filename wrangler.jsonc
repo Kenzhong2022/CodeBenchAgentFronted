@@ -1,4 +1,5 @@
 {
+  // 重新部署
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "personal-playground-react",
   "main": ".open-next/worker.js",
