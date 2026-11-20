@@ -150,6 +150,12 @@ export const NAV_GROUPS: NavGroup[] = [
         description: "所有用户的提交记录查看与维护",
         icon: <BookOutlined />,
       },
+      {
+        key: "/admin/presets",
+        label: "通话预设",
+        description: "RealtimeKit 预设与权限管理（会中角色能力配置）",
+        icon: <ApiOutlined />,
+      },
     ],
   },
 ];

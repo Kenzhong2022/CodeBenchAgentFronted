@@ -314,6 +314,7 @@ export default function CrudManager({
   onChange,
   actionLabels,
   rowActions,
+  hideActions,
   filterFields,
   onFilterSearch,
   toolbar,
@@ -335,6 +336,8 @@ export default function CrudManager({
   actionLabels?: CrudActionLabels;
   // 操作列的扩展按钮（如「预览」），渲染在编辑/删除之前
   rowActions?: (row: Row) => ReactNode;
+  // 操作列按钮隐藏开关（如预设管理暂不开放编辑：hideActions={{ edit: true }}）
+  hideActions?: { edit?: boolean; remove?: boolean };
   // 内嵌筛选栏的字段配置；未传时由 fields 自动推导（见 deriveFilterFields），与 onFilterSearch 成对使用
   filterFields?: FilterField[];
   // 点击筛选栏查询（或回车）/重置时触发；undefined/空串/空数组的条件已剔除
@@ -682,17 +685,21 @@ export default function CrudManager({
             render: (_, row) => (
               <Space size={4} wrap={false}>
                 {rowActions?.(row)}
-                <Button type="link" size="small" onClick={() => openEdit(row)}>
-                  {labels.edit}
-                </Button>
-                <Button
-                  type="link"
-                  size="small"
-                  danger
-                  onClick={() => remove(row)}
-                >
-                  {labels.remove}
-                </Button>
+                {!hideActions?.edit && (
+                  <Button type="link" size="small" onClick={() => openEdit(row)}>
+                    {labels.edit}
+                  </Button>
+                )}
+                {!hideActions?.remove && (
+                  <Button
+                    type="link"
+                    size="small"
+                    danger
+                    onClick={() => remove(row)}
+                  >
+                    {labels.remove}
+                  </Button>
+                )}
               </Space>
             ),
           },

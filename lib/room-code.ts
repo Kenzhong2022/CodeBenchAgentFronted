@@ -12,6 +12,11 @@ const ROOM_CODE_TTL_SECONDS = 60 * 60 * 24 * 30;
 /** @description 房间元数据；status 为 closed 时不再签发 token */
 export type RoomRecord = {
   meetingId: string;
+  /**
+   * 房主规则：创建房间时固化为创建者的 user.id，此后不再变更（无房主转让逻辑），
+   * 直到房间关闭或 30 天 TTL 过期。close / rename 接口据此校验身份（非房主 403），
+   * 签发 token 时与之比对决定 isHost（房主用 host 预设，其他人用 participant 预设）
+   */
   ownerId: string | null;
   /** 房间名称：创建时由房主填写，默认「用户名 + 视频会议」 */
   name: string;
