@@ -137,6 +137,26 @@ export default function MeetingRoom({
     window.history.replaceState(null, "", "/CodeAgent/meeting");
   }, []);
 
+  // 通话结束 / 主动挂断（含房主关闭、被踢出）后回到入口：清掉地址栏 room 参数，
+  // 避免刷新或复制链接时误重进；disconnected / connected-meeting 是 SDK 的断线
+  // 重连状态，不算离开，保持当前房间等待自动恢复
+  useEffect(() => {
+    if (state.status !== "joined" || !meeting) return;
+    const onRoomLeft = (payload: { state: string }) => {
+      if (
+        payload.state === "connected-meeting" ||
+        payload.state === "disconnected"
+      ) {
+        return;
+      }
+      resetToIdle();
+    };
+    meeting.self.on("roomLeft", onRoomLeft);
+    return () => {
+      meeting.self.removeListener("roomLeft", onRoomLeft);
+    };
+  }, [state.status, meeting, resetToIdle]);
+
   // 入口回调：创建 / 加入都走统一的 join 流程
   const handleCreate = useCallback(() => {
     setState({ status: "joining" });
