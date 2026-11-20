@@ -1,6 +1,6 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "react-project",
+  "name": "personal-playground-react",
   "main": ".open-next/worker.js",
   "compatibility_date": "2026-11-01",
   "compatibility_flags": ["nodejs_compat"],
@@ -33,5 +33,5 @@
   // ...
   // 机密（TURNSTILE_SECRET / SUPABASE_S3_ACCESS_KEY_ID / SUPABASE_S3_SECRET_ACCESS_KEY /
   // UPSTASH_REDIS_REST_URL / UPSTASH_REDIS_REST_TOKEN / CLOUDFLARE_REALTIME_API_TOKEN）
-  // 用 `npx wrangler secret put <NAME> --name codebenchagentfronted` 设置
+  // 用 `npx wrangler secret put <NAME> --name personal-playground-react` 设置
 }
